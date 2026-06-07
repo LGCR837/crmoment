@@ -16,6 +16,10 @@
     --md-elevation-level2: 0 3px 6px rgba(0,0,0,0.14), 0 2px 4px rgba(0,0,0,0.10);
     --md-elevation-level3: 0 6px 12px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.12);
     --content-max-width: 680px;
+    /* 滚动条颜色（浅色） */
+    --scrollbar-track: #f5f0fa;
+    --scrollbar-thumb: #c4b5d0;
+    --scrollbar-thumb-hover: #b09ec2;
 }
 
 /* ===== 深色模式 ===== */
@@ -36,26 +40,14 @@
     --md-elevation-level1: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
     --md-elevation-level2: 0 3px 6px rgba(0,0,0,0.48), 0 2px 4px rgba(0,0,0,0.36);
     --md-elevation-level3: 0 6px 12px rgba(0,0,0,0.52), 0 3px 6px rgba(0,0,0,0.4);
+    /* 滚动条颜色（深色） */
+    --scrollbar-track: #2d2a33;
+    --scrollbar-thumb: #6a6478;
+    --scrollbar-thumb-hover: #7e7890;
 }
 
 [data-theme="dark"] body {
     background: #141218;
-}
-
-[data-theme="dark"] * {
-    scrollbar-color: #3a3640 #1e1c22;
-}
-
-[data-theme="dark"] ::-webkit-scrollbar-track {
-    background: #1e1c22;
-}
-
-[data-theme="dark"] ::-webkit-scrollbar-thumb {
-    background: #3a3640;
-}
-
-[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-    background: #4e4a57;
 }
 
 [data-theme="dark"] #app-bar {
@@ -128,25 +120,26 @@
 /* ===== 自定义滚动条 ===== */
 /* Firefox */
 * {
+    scrollbar-color: var(--scrollbar-thumb, #c4b5d0) var(--scrollbar-track, #f5f0fa);
     scrollbar-width: thin;
-    scrollbar-color: #c4b5d0 #f5f0fa;
 }
+
 /* WebKit (Chrome, Edge, Safari) */
 ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
 }
 ::-webkit-scrollbar-track {
-    background: #f5f0fa;
+    background: var(--scrollbar-track, #f5f0fa);
     border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb {
-    background: #c4b5d0;
+    background: var(--scrollbar-thumb, #c4b5d0);
     border-radius: 3px;
     transition: background 0.2s;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: #b09ec2;
+    background: var(--scrollbar-thumb-hover, #b09ec2);
 }
 
 html, body {
