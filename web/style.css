@@ -19,6 +19,30 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* ===== 自定义滚动条 ===== */
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #c4b5d0 #f5f0fa;
+}
+/* WebKit (Chrome, Edge, Safari) */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #f5f0fa;
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb {
+    background: #c4b5d0;
+    border-radius: 3px;
+    transition: background 0.2s;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #b09ec2;
+}
+
 html, body {
     font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
     background: var(--md-sys-color-surface);
@@ -41,6 +65,12 @@ html, body {
     border-bottom: 1px solid #e0e0e0;
     box-shadow: 0 1px 2px rgba(0,0,0,0.06);
 }
+
+/* 对话框打开时降低导航栏 z-index，使 MWC dialog shadow DOM 中的遮罩层盖过导航栏 */
+body.dialog-open #app-bar {
+    z-index: 0;
+}
+
 .top-bar-right {
     display: flex;
     align-items: center;
@@ -52,12 +82,6 @@ html, body {
     height: 48px;
     width: auto;
     display: block;
-}
-
-/* 对话框打开时取消导航栏的 sticky 定位，避免穿透遮罩层 */
-body.dialog-open #app-bar {
-    position: relative;
-    z-index: auto;
 }
 
 /* ===== 二级导航栏（正常放置，滚动时自然上移） ===== */
@@ -126,6 +150,13 @@ md-icon-button:hover .avatar-small {
     font-weight: 500; font-size: 15px; cursor: pointer;
 }
 .post-author:hover { color: var(--md-sys-color-primary); }
+
+.post-badge {
+    font-size: 11px; font-weight: 600;
+    color: var(--md-sys-color-primary, #6750a4);
+    background: color-mix(in srgb, var(--md-sys-color-primary, #6750a4) 12%, transparent);
+    padding: 2px 8px; border-radius: 10px;
+}
 
 .post-time {
     font-size: 12px; color: var(--md-sys-color-on-surface-variant);
@@ -347,12 +378,13 @@ md-dialog [slot="headline"] {
 .comment-item .comment-avatar {
     width: 32px; height: 32px; border-radius: 50%;
     object-fit: cover; background: #e0e0e0;
-    flex-shrink: 0;
+    flex-shrink: 0; cursor: pointer;
 }
 .comment-item .comment-body { flex: 1; }
 .comment-item .comment-author {
-    font-weight: 500; font-size: 13px;
+    font-weight: 500; font-size: 13px; cursor: pointer; display: inline-block;
 }
+.comment-item .comment-author:hover { color: var(--md-sys-color-primary); }
 .comment-item .comment-text {
     font-size: 14px; line-height: 1.4;
     margin-top: 2px; white-space: pre-wrap;
@@ -397,6 +429,12 @@ md-dialog [slot="headline"] {
 }
 
 /* ===== 个人主页 ===== */
+.user-profile-back {
+    text-align: left; margin-bottom: 8px;
+}
+.user-profile-back md-text-button {
+    --md-text-button-label-text-color: var(--md-sys-color-primary);
+}
 .profile-header {
     text-align: center; padding: 24px 0;
 }

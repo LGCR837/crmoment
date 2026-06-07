@@ -3,247 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CRMoment - 轻量社交动态平台</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>CRMoment</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
             background: linear-gradient(135deg, #f5f0ff 0%, #fef7ff 50%, #f3e8fd 100%);
             color: #1d1b20;
             min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             line-height: 1.5;
         }
-        .container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
 
-        /* 导航栏 */
-        nav {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 16px 0;
+        .landing {
+            text-align: center;
+            padding: 48px 32px;
         }
-        .logo {
-            font-size: 22px; font-weight: 700;
-            background: linear-gradient(135deg, #6750a4, #9c27b0);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        .nav-links { display: flex; gap: 16px; align-items: center; }
-        .nav-links a {
-            text-decoration: none; color: #49454f;
-            font-size: 14px; font-weight: 500;
-            padding: 8px 16px; border-radius: 20px;
-            transition: background 0.2s;
-        }
-        .nav-links a:hover { background: rgba(103, 80, 164, 0.08); }
-        .nav-links .btn-primary {
-            background: #6750a4; color: #fff;
-            padding: 8px 20px;
-        }
-        .nav-links .btn-primary:hover { background: #7c67b8; }
 
-        /* Hero */
-        .hero {
-            text-align: center; padding: 80px 0 60px;
+        .logo-img {
+            width: 305px;
+            height: 125px;
+            margin-bottom: 24px;
+            object-fit: contain;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
         }
-        .hero .icon { font-size: 64px; margin-bottom: 16px; }
-        .hero h1 {
-            font-size: 42px; font-weight: 700;
-            margin-bottom: 12px;
+
+        h1 {
+            font-size: 32px;
+            font-weight: 700;
             background: linear-gradient(135deg, #6750a4, #9c27b0);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
             background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            margin-bottom: 8px;
         }
-        .hero p {
-            font-size: 18px; color: #49454f;
-            max-width: 540px; margin: 0 auto 32px;
+
+        .subtitle {
+            font-size: 15px;
+            color: #49454f;
+            max-width: 360px;
+            margin: 0 auto 28px;
         }
-        .hero-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-        .hero-buttons a {
-            display: inline-flex; align-items: center; gap: 8px;
-            padding: 12px 28px; border-radius: 28px;
-            text-decoration: none; font-weight: 600; font-size: 15px;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .hero-buttons a:hover { transform: translateY(-2px); }
-        .hero-buttons .btn-primary {
-            background: #6750a4; color: #fff;
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 32px;
+            border-radius: 28px;
+            background: #6750a4;
+            color: #fff;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 15px;
             box-shadow: 0 2px 8px rgba(103, 80, 164, 0.3);
-        }
-        .hero-buttons .btn-primary:hover { box-shadow: 0 4px 16px rgba(103, 80, 164, 0.4); }
-        .hero-buttons .btn-outline {
-            border: 2px solid #6750a4; color: #6750a4;
-        }
-        .hero-buttons .btn-outline:hover { background: rgba(103, 80, 164, 0.05); }
-
-        /* 特性 */
-        .features {
-            display: grid; grid-template-columns: repeat(3, 1fr);
-            gap: 24px; padding: 40px 0 60px;
-        }
-        .feature-card {
-            background: #fff; border-radius: 20px;
-            padding: 28px 24px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
             transition: transform 0.2s, box-shadow 0.2s;
         }
-        .feature-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-        }
-        .feature-card .feature-icon { font-size: 36px; margin-bottom: 12px; }
-        .feature-card h3 { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
-        .feature-card p { font-size: 14px; color: #49454f; line-height: 1.6; }
 
-        /* 技术栈 */
-        .tech-section {
-            text-align: center; padding: 40px 0 60px;
-        }
-        .tech-section h2 { font-size: 24px; font-weight: 700; margin-bottom: 24px; }
-        .tech-icons {
-            display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;
-        }
-        .tech-tag {
-            background: #fff; padding: 10px 20px;
-            border-radius: 12px; font-size: 14px; font-weight: 500;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-            border: 1px solid #f0ebff;
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(103, 80, 164, 0.4);
         }
 
-        /* API 总览 */
-        .api-section {
-            padding: 40px 0 60px;
+        .footer {
+            margin-top: 40px;
+            color: #79747e;
+            font-size: 13px;
         }
-        .api-section h2 { font-size: 24px; font-weight: 700; margin-bottom: 24px; text-align: center; }
-        .api-grid {
-            display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
-            background: #fff; border-radius: 20px; padding: 24px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-        }
-        .api-item {
-            display: flex; align-items: center; gap: 10px;
-            padding: 8px 12px; border-radius: 8px;
-            font-size: 13px; font-family: 'SF Mono', 'Fira Code', monospace;
-        }
-        .api-method {
-            display: inline-block; padding: 2px 8px; border-radius: 4px;
-            font-size: 11px; font-weight: 700; color: #fff;
-            min-width: 48px; text-align: center;
-        }
-        .api-method.get { background: #61affe; }
-        .api-method.post { background: #49cc90; }
-        .api-method.put { background: #fca130; }
-        .api-method.delete { background: #f93e3e; }
 
-        /* Footer */
-        footer {
-            text-align: center; padding: 32px 0;
-            color: #79747e; font-size: 13px;
-            border-top: 1px solid #f0ebff;
+        @media (max-width: 640px) {
+            .landing {
+                padding: 32px 20px;
+            }
+            h1 {
+                font-size: 26px;
+            }
+            .logo-img {
+                width: 244px;
+                height: 100px;
+            }
         }
-        footer a { color: #6750a4; text-decoration: none; }
-        footer a:hover { text-decoration: underline; }
 
-        /* 响应式 */
-        @media (max-width: 720px) {
-            .hero h1 { font-size: 32px; }
-            .hero p { font-size: 16px; }
-            .features { grid-template-columns: 1fr; }
-            .api-grid { grid-template-columns: 1fr; }
-            .hero { padding: 40px 0 32px; }
-            .nav-links a { font-size: 13px; padding: 6px 12px; }
-        }
         @media (max-width: 480px) {
-            nav { flex-direction: column; gap: 12px; }
-            .hero h1 { font-size: 26px; }
-            .hero-buttons a { width: 100%; justify-content: center; }
+            .logo-img {
+                width: 200px;
+                height: 82px;
+            }
+        }
+
+        @media (min-resolution: 2dppx) {
+            .logo-img {
+                width: 305px;
+                height: 125px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <nav>
-            <div class="logo">📱 CRMoment</div>
-            <div class="nav-links">
-                <a href="#features">特性</a>
-                <a href="#api">接口</a>
-                <a href="https://github.com/" target="_blank">GitHub</a>
-                <a href="/web/" class="btn-primary">进入 Web 版 →</a>
-            </div>
-        </nav>
-
-        <section class="hero">
-            <div class="icon">📱</div>
-            <h1>CRMoment</h1>
-            <p>一个轻量的社交动态分享平台。基于 PHP + MySQL，简单、快速、可自托管。</p>
-            <div class="hero-buttons">
-                <a href="/web/" class="btn-primary">✨ 进入 Web 版</a>
-                <a href="#features" class="btn-outline">了解更多</a>
-            </div>
-        </section>
-
-        <section id="features" class="features">
-            <div class="feature-card">
-                <div class="feature-icon">⚡</div>
-                <h3>极简部署</h3>
-                <p>上传即用，仅需 PHP + MySQL。无需 Node.js、无需构建工具、无需复杂配置。</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">🔓</div>
-                <h3>公开浏览</h3>
-                <p>未登录也可浏览动态和评论。登录后可发布内容、点赞、评论，体验完整社交。</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">📦</div>
-                <h3>本地存储</h3>
-                <p>头像和动态图片存储于服务器本地，不依赖第三方云存储服务。</p>
-            </div>
-        </section>
-
-        <section class="tech-section">
-            <h2>🛠 技术栈</h2>
-            <div class="tech-icons">
-                <span class="tech-tag">PHP 8+</span>
-                <span class="tech-tag">MySQL</span>
-                <span class="tech-tag">PDO</span>
-                <span class="tech-tag">Session Auth</span>
-                <span class="tech-tag">Material Web</span>
-                <span class="tech-tag">RESTful API</span>
-            </div>
-        </section>
-
-        <section id="api" class="api-section">
-            <h2>📋 接口概览</h2>
-            <div class="api-grid">
-                <div class="api-item"><span class="api-method post">POST</span> /api.php?route=/auth/register</div>
-                <div class="api-item"><span class="api-method post">POST</span> /api.php?route=/auth/login</div>
-                <div class="api-item"><span class="api-method post">POST</span> /api.php?route=/auth/logout</div>
-                <div class="api-item"><span class="api-method get">GET</span> /api.php?route=/user/me</div>
-                <div class="api-item"><span class="api-method get">GET</span> /api.php?route=/user/:id</div>
-                <div class="api-item"><span class="api-method post">POST</span> /api.php?route=/user/avatar</div>
-                <div class="api-item"><span class="api-method get">GET</span> /api.php?route=/posts</div>
-                <div class="api-item"><span class="api-method post">POST</span> /api.php?route=/posts</div>
-                <div class="api-item"><span class="api-method get">GET</span> /api.php?route=/posts/:id</div>
-                <div class="api-item"><span class="api-method delete">DELETE</span> /api.php?route=/posts/:id</div>
-                <div class="api-item"><span class="api-method post">POST</span> /api.php?route=/posts/:id/like</div>
-                <div class="api-item"><span class="api-method delete">DELETE</span> /api.php?route=/posts/:id/like</div>
-                <div class="api-item"><span class="api-method get">GET</span> /api.php?route=/posts/:id/comments</div>
-                <div class="api-item"><span class="api-method post">POST</span> /api.php?route=/posts/:id/comments</div>
-                <div class="api-item"><span class="api-method delete">DELETE</span> /api.php?route=/comments/:id</div>
-                <div class="api-item"><span class="api-method get">GET</span> /api.php?route=/notifications</div>
-                <div class="api-item"><span class="api-method get">GET</span> /api.php?route=/notifications/unread</div>
-                <div class="api-item"><span class="api-method put">PUT</span> /api.php?route=/notifications/read</div>
-                <div class="api-item"><span class="api-method post">POST</span> /api.php?route=/upload/image</div>
-            </div>
-        </section>
-
-        <footer>
-            <p>CRMoment · 基于 PHP + MySQL · <a href="/web/">Web 版入口</a></p>
-            <p style="margin-top:4px;">部署文档见 <a href="/docs/deployment.md">docs/deployment.md</a></p>
-        </footer>
+    <div class="landing">
+        <img src="/web/crmomentlogo.png" alt="CRMoment" class="logo-img">
+        <p class="subtitle">轻量的社交动态分享平台</p>
+        <a href="/web/" class="btn">CRMoment Web</a>
+        <p class="footer">CRMoment · Powered by LGCR837</p>
     </div>
 </body>
 </html>

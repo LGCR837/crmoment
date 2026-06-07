@@ -47,7 +47,8 @@ const state = {
     page: 1,                  // 当前页码
     hasMore: true,
     loading: false,
-    currentPage: 'home',      // home / profile / explore
+    currentPage: 'home',      // home / profile / explore / user
+    viewUserId: null,         // 正在查看的用户 ID（当 currentPage === 'user'）
     commentPostId: null,      // 正在查看评论的动态 ID
     selectedImages: [],       // 待上传图片
 };
@@ -63,6 +64,7 @@ const dom = {
     authForm: $('#auth-form'),
     authUsername: $('#auth-username'),
     authPassword: $('#auth-password'),
+    authPasswordConfirm: $('#auth-password-confirm'),
     authError: $('#auth-error'),
     authSubmit: $('#auth-submit'),
     authCancel: $('#auth-cancel'),
@@ -96,6 +98,8 @@ const dom = {
     imageViewerDialog: $('#image-viewer-dialog'),
     imageViewerImg: $('#image-viewer-img'),
     imageViewerClose: $('#image-viewer-close'),
+    imageViewerCopy: $('#image-viewer-copy'),
+    imageViewerOpen: $('#image-viewer-open'),
 };
 
 // ===== API 请求 =====
@@ -146,13 +150,26 @@ function showToast(msg) {
 
 // ===== MWC 对话框辅助 =====
 let dialogCount = 0;
+/** 所有已注册 close 事件监听的 dialog 集合，避免重复绑定 */
+const dialogCloseListeners = new WeakSet();
 
 function dialogOpen(el) {
     if (el && typeof el.show === 'function') {
         el.show();
-        // 打开对话框时隐藏导航栏（避免 sticky 穿透遮罩层）
         dialogCount++;
         document.body.classList.add('dialog-open');
+        // 监听原生 close 事件（Escape 键关闭时会触发），确保 body class 被清理
+        if (!dialogCloseListeners.has(el)) {
+            el.addEventListener('close', () => {
+                // MWC dialog 的 close 事件在 shadow DOM 内部 dialog 关闭时触发
+                dialogCount--;
+                if (dialogCount <= 0) {
+                    dialogCount = 0;
+                    document.body.classList.remove('dialog-open');
+                }
+            });
+            dialogCloseListeners.add(el);
+        }
         // 修正：MWC md-dialog 内部 <dialog> 使用 margin:inherit，
         // 但 :host 的 display:contents 使继承链断裂(<dialog> 从 <body> 继承 margin:0)，
         // 导致对话框出现在左上角。此处强制设置 margin:auto。
@@ -187,6 +204,9 @@ function switchAuthMode(mode) {
     dom.authTabRegister.classList.toggle('active', mode === 'register');
     dom.authError.style.display = 'none';
     dom.authPassword.value = '';
+    dom.authPasswordConfirm.value = '';
+    dom.authPasswordConfirm.style.display = mode === 'register' ? '' : 'none';
+    dom.authPasswordConfirm.required = mode === 'register';
 }
 
 dom.authTabLogin.addEventListener('click', () => switchAuthMode('login'));
@@ -195,9 +215,16 @@ dom.authTabRegister.addEventListener('click', () => switchAuthMode('register'));
 dom.authSubmit.addEventListener('click', async () => {
     const username = dom.authUsername.value.trim();
     const password = dom.authPassword.value;
+    const confirmPassword = dom.authPasswordConfirm.value;
 
     if (!username || !password) {
         dom.authError.textContent = '请填写用户名和密码';
+        dom.authError.style.display = 'block';
+        return;
+    }
+
+    if (authMode === 'register' && password !== confirmPassword) {
+        dom.authError.textContent = '两次密码输入不一致';
         dom.authError.style.display = 'block';
         return;
     }
@@ -212,6 +239,7 @@ dom.authSubmit.addEventListener('click', async () => {
         dom.authError.style.display = 'none';
         dom.authUsername.value = '';
         dom.authPassword.value = '';
+        dom.authPasswordConfirm.value = '';
         showToast(authMode === 'login' ? '登录成功' : '注册成功');
         renderHome();
     } catch (e) {
@@ -267,6 +295,14 @@ $$('.nav-btn').forEach(btn => {
         navigateTo(page);
     });
 });
+
+// 点击右上角头像跳转个人主页
+const userAvatarBtn = $('#btn-user-avatar');
+if (userAvatarBtn) {
+    userAvatarBtn.addEventListener('click', () => {
+        navigateTo('profile');
+    });
+}
 
 function navigateTo(page) {
     state.currentPage = page;
@@ -367,13 +403,33 @@ function renderPosts(container) {
     container.querySelectorAll('.comment-btn').forEach(btn => {
         btn.addEventListener('click', () => openComments(btn.dataset.postId));
     });
+    container.querySelectorAll('.share-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const url = btn.dataset.url;
+            navigator.clipboard.writeText(url).then(() => {
+                showToast('链接已复制到剪贴板');
+            }).catch(() => {
+                // 降级方案
+                const ta = document.createElement('textarea');
+                ta.value = url;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                showToast('链接已复制到剪贴板');
+            });
+        });
+    });
     container.querySelectorAll('.post-images img').forEach(img => {
         img.addEventListener('click', () => openImageViewer(img.src));
     });
     container.querySelectorAll('.post-author, .post-avatar').forEach(el => {
-        el.addEventListener('click', () => {
-            // 导航到用户主页 (future: show user detail)
-            showToast('查看用户详情');
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const userId = el.dataset.userId;
+            if (userId) {
+                navigateToUserProfile(parseInt(userId));
+            }
         });
     });
 }
@@ -383,14 +439,16 @@ function renderPostCard(post) {
     const images = post.images || [];
     const imageHtml = renderImages(images);
     const likedClass = post.is_liked ? 'liked' : '';
+    const postUrl = `https://crmoment.ccwu.cc/web#${post.id}`;
 
     return `
     <div class="post-card" data-post-id="${post.id}">
         <div class="post-header">
             <img src="${post.avatar || '/uploads/avatars/default.svg'}" 
-                 class="post-avatar"
+                 class="post-avatar" data-user-id="${post.user_id}"
                  onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#e0e0e0"/><text x="20" y="26" text-anchor="middle" font-size="18" fill="#999">' + post.username[0] + '</text></svg>')}'">
-            <span class="post-author">${escapeHtml(post.username)}</span>
+            <span class="post-author" data-user-id="${post.user_id}">${escapeHtml(post.username)}</span>
+            <span class="post-badge">#${post.id}</span>
             <span class="post-time">${time}</span>
         </div>
         <div class="post-content">${escapeHtml(post.content)}</div>
@@ -403,6 +461,10 @@ function renderPostCard(post) {
             <button class="action-btn comment-btn" data-post-id="${post.id}">
                 <md-icon>chat_bubble_outline</md-icon>
                 <span>${post.comments_count || 0}</span>
+            </button>
+            <button class="action-btn share-btn" data-url="${postUrl}">
+                <md-icon>share</md-icon>
+                <span>分享</span>
             </button>
         </div>
     </div>`;
@@ -479,16 +541,18 @@ function renderComments(comments) {
 
     dom.commentList.innerHTML = comments.map(c => `
         <div class="comment-item">
-            <img src="${c.avatar || '/uploads/avatars/default.svg'}" class="comment-avatar"
+            <img src="${c.avatar || '/uploads/avatars/default.svg'}" class="comment-avatar" data-user-id="${c.user_id}"
                  onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#e0e0e0"/><text x="16" y="21" text-anchor="middle" font-size="14" fill="#999">' + c.username[0] + '</text></svg>')}'">
             <div class="comment-body">
-                <div class="comment-author">${escapeHtml(c.username)}</div>
+                <div class="comment-author" data-user-id="${c.user_id}">${escapeHtml(c.username)}</div>
                 <div class="comment-text">${escapeHtml(c.content)}</div>
                 <div class="comment-time">${formatTime(c.created_at)}</div>
                 ${c.replies && c.replies.length > 0 ? c.replies.map(r => `
                     <div class="comment-item" style="margin-top:8px;padding-left:42px;border:none">
-                        <div class="comment-body">
-                            <div class="comment-author">${escapeHtml(r.username)}</div>
+                        <img src="${r.avatar || '/uploads/avatars/default.svg'}" class="comment-avatar" data-user-id="${r.user_id}"
+                             onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#e0e0e0"/><text x="16" y="21" text-anchor="middle" font-size="14" fill="#999">' + r.username[0] + '</text></svg>')}'">
+                        <div class="comment-body" style="margin-left:0">
+                            <div class="comment-author" data-user-id="${r.user_id}">${escapeHtml(r.username)}</div>
                             <div class="comment-text">${escapeHtml(r.content)}</div>
                             <div class="comment-time">${formatTime(r.created_at)}</div>
                         </div>
@@ -497,6 +561,18 @@ function renderComments(comments) {
             </div>
         </div>
     `).join('\n');
+
+    // 点击评论中的头像/用户名跳转到用户主页
+    dom.commentList.querySelectorAll('.comment-avatar, .comment-author').forEach(el => {
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const userId = el.dataset.userId;
+            if (userId) {
+                dialogClose(dom.commentDialog);
+                navigateToUserProfile(parseInt(userId));
+            }
+        });
+    });
 }
 
 dom.commentSubmit.addEventListener('click', async () => {
@@ -594,11 +670,30 @@ dom.composerCancel.addEventListener('click', () => {
 });
 
 // ===== 图片查看器 =====
+let _viewerImageSrc = '';
+
 function openImageViewer(src) {
+    _viewerImageSrc = src;
     dom.imageViewerImg.src = src;
     dialogOpen(dom.imageViewerDialog);
 }
 dom.imageViewerClose.addEventListener('click', () => dialogClose(dom.imageViewerDialog));
+
+dom.imageViewerOpen.addEventListener('click', () => {
+    if (_viewerImageSrc) {
+        window.open(_viewerImageSrc, '_blank');
+    }
+});
+
+dom.imageViewerCopy.addEventListener('click', async () => {
+    if (!_viewerImageSrc) return;
+    try {
+        await navigator.clipboard.writeText(_viewerImageSrc);
+        showToast('图片直链已复制到剪贴板');
+    } catch (e) {
+        showToast('复制失败');
+    }
+});
 
 // ===== 通知 =====
 dom.btnNotifications.addEventListener('click', () => {
@@ -681,15 +776,17 @@ async function renderProfile() {
                  class="profile-avatar" id="profile-avatar-img"
                  onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><circle cx="40" cy="40" r="40" fill="#e0e0e0"/><text x="40" y="50" text-anchor="middle" font-size="30" fill="#999">' + state.user.username[0] + '</text></svg>')}'">
             <div class="profile-username">${escapeHtml(state.user.username)}</div>
-            <div class="profile-bio">${state.user.bio ? escapeHtml(state.user.bio) : '这个人很懒，什么都没写...'}</div>
+            <div class="profile-bio" id="profile-bio" contenteditable="true" data-original="${escapeHtml(state.user.bio || '')}">
+                ${state.user.bio ? escapeHtml(state.user.bio) : '这个人很懒，什么都没写...'}
+            </div>
             <div class="profile-stats">
                 <div class="stat"><div class="stat-num" id="profile-post-count">0</div><div class="stat-label">动态</div></div>
             </div>
             <div class="profile-edit-btn">
-                <md-outlined-button id="btn-edit-avatar">
+                <md-text-button id="btn-edit-avatar">
                     <md-icon slot="icon">photo_camera</md-icon>
                     更换头像
-                </md-outlined-button>
+                </md-text-button>
                 <md-text-button id="btn-logout" style="color:var(--md-sys-color-error);">
                     退出登录
                 </md-text-button>
@@ -721,15 +818,43 @@ async function renderProfile() {
         }
     });
 
+    // 修改简介
+    const bioDiv = $('#profile-bio');
+    if (bioDiv) {
+        const saveBio = async () => {
+            const newBio = bioDiv.innerText.trim();
+            const originalBio = bioDiv.dataset.original;
+            if (newBio === originalBio) return;
+            try {
+                const result = await api('POST', '/user/bio', { bio: newBio });
+                state.user.bio = result.bio;
+                bioDiv.dataset.original = newBio;
+                showToast('简介已更新');
+            } catch (e) {
+                showToast(e.message);
+                bioDiv.innerText = originalBio;
+            }
+        };
+        bioDiv.addEventListener('blur', saveBio);
+        bioDiv.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                bioDiv.blur();
+            }
+        });
+    }
+
     // 加载用户动态
     try {
         const data = await api('GET', `/posts?page=1&size=20`);
-        $('#profile-post-count').textContent = data.total;
         const myPosts = data.list.filter(p => p.user_id === state.user.id);
+        const myPostsCount = myPosts.length;
+        $('#profile-post-count').textContent = myPostsCount;
+
         if (myPosts.length === 0) {
             $('#my-posts').innerHTML = '<div class="end-indicator">还没有发布过动态</div>';
         } else {
-            state.posts = myPosts; // 复用 posts 列表用于点赞
+            state.posts = myPosts;
             $('#my-posts').innerHTML = myPosts.map(p => renderPostCard(p)).join('\n');
             $('#my-posts').querySelectorAll('.like-btn').forEach(btn => {
                 btn.addEventListener('click', () => handleLike(btn.dataset.postId));
@@ -743,6 +868,90 @@ async function renderProfile() {
         }
     } catch (e) {
         $('#my-posts').innerHTML = `<div class="end-indicator">加载失败: ${e.message}</div>`;
+    }
+}
+
+// ===== 用户详情页（查看他人主页） =====
+function navigateToUserProfile(userId) {
+    state.currentPage = 'user';
+    state.viewUserId = userId;
+    $$('.nav-btn').forEach(b => b.classList.remove('active'));
+    renderUserProfile(userId);
+}
+
+async function renderUserProfile(userId) {
+    dom.main.innerHTML = '<div class="loading-indicator"><md-circular-progress indeterminate></md-circular-progress></div>';
+
+    try {
+        const [user, postsData] = await Promise.all([
+            api('GET', `/user/${userId}`),
+            api('GET', `/posts?page=1&size=20`),
+        ]);
+
+        const isSelf = state.user && state.user.id === userId;
+
+        dom.main.innerHTML = `
+            <div class="profile-header">
+                <div class="user-profile-back">
+                    <md-text-button id="btn-back-from-user">
+                        <md-icon slot="icon">arrow_back</md-icon>
+                        返回
+                    </md-text-button>
+                </div>
+                <img src="${user.avatar || '/uploads/avatars/default.svg'}" 
+                     class="profile-avatar"
+                     onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><circle cx="40" cy="40" r="40" fill="#e0e0e0"/><text x="40" y="50" text-anchor="middle" font-size="30" fill="#999">' + user.username[0] + '</text></svg>')}'">
+                <div class="profile-username">${escapeHtml(user.username)}</div>
+                <div class="profile-bio">${user.bio ? escapeHtml(user.bio) : '这个人很懒，什么都没写...'}</div>
+                <div class="profile-stats">
+                    <div class="stat"><div class="stat-num">${user.posts_count || 0}</div><div class="stat-label">动态</div></div>
+                </div>
+            </div>
+            <div class="section-title">${escapeHtml(user.username)} 的动态</div>
+            <div id="user-posts"></div>
+        `;
+
+        $('#btn-back-from-user')?.addEventListener('click', () => {
+            state.currentPage = 'home';
+            $$('.nav-btn').forEach(b => b.classList.remove('active'));
+            const homeBtn = document.querySelector('.nav-btn[data-page="home"]');
+            if (homeBtn) homeBtn.classList.add('active');
+            renderHome();
+        });
+
+        const userPosts = postsData.list.filter(p => p.user_id === userId);
+        const container = $('#user-posts');
+        if (userPosts.length === 0) {
+            container.innerHTML = '<div class="end-indicator">还没有发布过动态</div>';
+        } else {
+            state.posts = userPosts;
+            container.innerHTML = userPosts.map(p => renderPostCard(p)).join('\n');
+            container.querySelectorAll('.like-btn').forEach(btn => {
+                btn.addEventListener('click', () => handleLike(btn.dataset.postId));
+            });
+            container.querySelectorAll('.comment-btn').forEach(btn => {
+                btn.addEventListener('click', () => openComments(btn.dataset.postId));
+            });
+            container.querySelectorAll('.post-images img').forEach(img => {
+                img.addEventListener('click', () => openImageViewer(img.src));
+            });
+        }
+    } catch (e) {
+        dom.main.innerHTML = `
+            <div class="profile-header">
+                <div class="user-profile-back">
+                    <md-text-button id="btn-back-from-user">
+                        <md-icon slot="icon">arrow_back</md-icon>
+                        返回
+                    </md-text-button>
+                </div>
+                <p style="color:var(--md-sys-color-error);text-align:center;">加载失败: ${escapeHtml(e.message)}</p>
+            </div>
+        `;
+        $('#btn-back-from-user')?.addEventListener('click', () => {
+            state.currentPage = 'home';
+            renderHome();
+        });
     }
 }
 
@@ -815,7 +1024,20 @@ async function init() {
     updateAuthUI();
 
     // 渲染主页
-    renderHome();
+    await renderHome();
+
+    // 检查 hash 定位到指定动态
+    const hash = window.location.hash.slice(1);
+    if (hash && /^\d+$/.test(hash)) {
+        const target = document.querySelector(`.post-card[data-post-id="${hash}"]`);
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            target.style.boxShadow = '0 0 0 3px var(--md-sys-color-primary, #6750a4), var(--md-elevation-level2)';
+            setTimeout(() => {
+                target.style.boxShadow = '';
+            }, 3000);
+        }
+    }
 
     // 定时检查未读通知
     if (state.user) {

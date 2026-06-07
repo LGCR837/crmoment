@@ -77,3 +77,32 @@ function handleUserAvatar(): void {
 
     success(['avatar' => $url], '头像上传成功');
 }
+
+/**
+ * POST /user/bio
+ * 修改个人简介
+ */
+function handleUserBio(): void {
+    assertMethod('POST');
+    $userId = requireLogin();
+
+    $body = getJsonBody();
+
+    $bio = trim($body['bio'] ?? '');
+    if ($bio === '') {
+        error('参数不能为空');
+    }
+    if (mb_strlen($bio) > 200) {
+        error('个人简介不能超过200个字符');
+    }
+
+    $pdo = getDB();
+    $stmt = $pdo->prepare('UPDATE users SET bio = ? WHERE id = ?');
+    $stmt->execute([$bio, $userId]);
+
+    if ($stmt->rowCount() === 0) {
+        error('更新失败，请稍后重试');
+    }
+
+    success(['bio' => $bio]);
+}

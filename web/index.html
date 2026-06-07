@@ -5,8 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CRMoment - 朋友圈</title>
 
-    <!-- 防止 favicon 404 -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📱</text></svg>">
+    <link rel="icon" href="/web/logo192.png">
 
     <!-- Material Icons 字体 -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,0&display=swap">
@@ -28,7 +27,7 @@
 <body>
     <!-- 顶部导航栏（粘性，标题左，登录/通知/头像右，在对话框遮罩下方） -->
     <header id="app-bar">
-        <img src="/web/crmomentlogo.png" alt="CRMoment" class="app-title">
+        <a href="/" class="app-title-link"><img src="/web/crmomentlogo.png" alt="CRMoment" class="app-title"></a>
         <div class="top-bar-right">
             <div class="nav-auth" id="nav-auth">
                 <md-filled-tonal-button id="btn-login" class="auth-btn">
@@ -95,6 +94,16 @@
                 minlength="6"
                 autocomplete="current-password"
                 class="auth-field"
+            ></md-outlined-text-field>
+            <md-outlined-text-field
+                id="auth-password-confirm"
+                label="确认密码"
+                type="password"
+                required
+                minlength="6"
+                autocomplete="new-password"
+                class="auth-field"
+                style="display:none"
             ></md-outlined-text-field>
             <div id="auth-error" class="error-message" style="display:none"></div>
         </form>
@@ -164,6 +173,14 @@
             <img id="image-viewer-img" src="" alt="" class="image-viewer-img">
         </div>
         <div slot="actions">
+            <md-text-button id="image-viewer-copy">
+                <md-icon slot="icon">share</md-icon>
+                分享
+            </md-text-button>
+            <md-text-button id="image-viewer-open">
+                <md-icon slot="icon">open_in_new</md-icon>
+                查看图片
+            </md-text-button>
             <md-text-button id="image-viewer-close">关闭</md-text-button>
         </div>
     </md-dialog>

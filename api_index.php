@@ -59,6 +59,8 @@ try {
     // ---- User ----
     } elseif ($path === '/user/me' && $method === 'GET') {
         handleUserMe();
+    } elseif ($path === '/user/bio' && $method === 'POST') {
+        handleUserBio();
     } elseif ($path === '/user/avatar' && $method === 'POST') {
         handleUserAvatar();
     } elseif (preg_match('#^/user/(\d+)$#', $path, $m) && $method === 'GET') {
