@@ -1059,7 +1059,7 @@ async function renderUserProfile(userId) {
 function renderExplore() {
     dom.main.innerHTML = `
         <div class="section-title">发现</div>
-        <div class="card" style="background:#fff;border-radius:16px;padding:24px;box-shadow:var(--md-elevation-level1);text-align:center;">
+        <div class="card" style="background:var(--md-sys-color-surface-container-low);border-radius:16px;padding:24px;box-shadow:var(--md-elevation-level1);text-align:center;">
             <md-icon style="font-size:48px;color:var(--md-sys-color-primary);margin-bottom:12px;">explore</md-icon>
             <h3 style="margin-bottom:8px;">探索 CRMoment</h3>
             <p style="color:var(--md-sys-color-on-surface-variant);line-height:1.6;">
