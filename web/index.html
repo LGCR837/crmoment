@@ -26,42 +26,43 @@
     <link rel="stylesheet" href="/web/style.css">
 </head>
 <body>
-    <!-- 顶部导航栏 -->
-    <md-top-app-bar id="app-bar">
-        <md-icon-button slot="navigationIcon" id="btn-menu">
-            <md-icon>menu</md-icon>
-        </md-icon-button>
-        <div slot="headline" class="app-title">CRMoment</div>
-        <div slot="trailingIcons" class="nav-tabs">
-            <md-text-button class="nav-btn active" data-page="home">
-                <md-icon slot="icon">home</md-icon>
-                主页
-            </md-text-button>
-            <md-text-button class="nav-btn" data-page="profile" id="nav-profile" style="display:none">
-                <md-icon slot="icon">person</md-icon>
-                我的
-            </md-text-button>
-            <md-text-button class="nav-btn" data-page="explore">
-                <md-icon slot="icon">explore</md-icon>
-                发现
-            </md-text-button>
+    <!-- 顶部导航栏（粘性，标题左，登录/通知/头像右，在对话框遮罩下方） -->
+    <header id="app-bar">
+        <img src="/web/crmomentlogo.png" alt="CRMoment" class="app-title">
+        <div class="top-bar-right">
+            <div class="nav-auth" id="nav-auth">
+                <md-filled-tonal-button id="btn-login" class="auth-btn">
+                    <md-icon slot="icon">login</md-icon>
+                    登录
+                </md-filled-tonal-button>
+            </div>
+            <div class="nav-user" id="nav-user" style="display:none">
+                <md-icon-button id="btn-notifications" class="notif-btn">
+                    <md-icon>notifications</md-icon>
+                    <md-badge id="notif-badge" style="display:none"></md-badge>
+                </md-icon-button>
+                <md-icon-button id="btn-user-avatar">
+                    <img id="user-avatar-img" src="/uploads/avatars/default.svg" alt="" class="avatar-small">
+                </md-icon-button>
+            </div>
         </div>
-        <div slot="trailingIcons" class="nav-auth" id="nav-auth">
-            <md-filled-tonal-button id="btn-login" class="auth-btn">
-                <md-icon slot="icon">login</md-icon>
-                登录
-            </md-filled-tonal-button>
-        </div>
-        <div slot="trailingIcons" class="nav-user" id="nav-user" style="display:none">
-            <md-icon-button id="btn-notifications" class="notif-btn">
-                <md-icon>notifications</md-icon>
-                <md-badge id="notif-badge" style="display:none"></md-badge>
-            </md-icon-button>
-            <md-icon-button id="btn-user-avatar">
-                <img id="user-avatar-img" src="/uploads/avatars/default.svg" alt="" class="avatar-small">
-            </md-icon-button>
-        </div>
-    </md-top-app-bar>
+    </header>
+
+    <!-- 二级导航栏（主页 / 我的 / 发现，居中，正常放置） -->
+    <div class="sub-nav" id="sub-nav">
+        <md-text-button class="nav-btn active" data-page="home">
+            <md-icon slot="icon">home</md-icon>
+            主页
+        </md-text-button>
+        <md-text-button class="nav-btn" data-page="profile" id="nav-profile" style="display:none">
+            <md-icon slot="icon">person</md-icon>
+            我的
+        </md-text-button>
+        <md-text-button class="nav-btn" data-page="explore">
+            <md-icon slot="icon">explore</md-icon>
+            发现
+        </md-text-button>
+    </div>
 
     <!-- 主内容区 -->
     <main class="main-content" id="main-content">
@@ -144,12 +145,12 @@
         <div slot="headline" id="comment-title">评论</div>
         <div slot="content">
             <div id="comment-list" class="comment-list"></div>
-            <md-outlined-textarea
+            <textarea
                 id="comment-input"
-                label="写评论..."
-                rows="2"
                 class="comment-input"
-            ></md-outlined-textarea>
+                rows="2"
+                placeholder="写评论..."
+            ></textarea>
         </div>
         <div slot="actions">
             <md-text-button id="comment-cancel">关闭</md-text-button>

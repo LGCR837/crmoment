@@ -27,23 +27,48 @@ html, body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* ===== 导航栏 ===== */
-md-top-app-bar {
-    --md-top-app-bar-container-color: var(--md-sys-color-surface);
-    --md-top-app-bar-headline-color: var(--md-sys-color-on-surface);
+/* ===== 顶部导航栏（粘性，始终可见） ===== */
+#app-bar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 52px;
+    padding: 0 16px;
+    background: var(--md-sys-color-surface, #fef7ff);
     border-bottom: 1px solid #e0e0e0;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+.top-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
+/* ===== Logo（图片） ===== */
 .app-title {
-    font-weight: 600;
-    font-size: 22px;
-    background: linear-gradient(135deg, #6750a4, #9c27b0);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    height: 48px;
+    width: auto;
+    display: block;
 }
 
-.nav-tabs { display: flex; gap: 4px; margin: 0 12px; }
+/* 对话框打开时取消导航栏的 sticky 定位，避免穿透遮罩层 */
+body.dialog-open #app-bar {
+    position: relative;
+    z-index: auto;
+}
+
+/* ===== 二级导航栏（正常放置，滚动时自然上移） ===== */
+.sub-nav {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--md-sys-color-surface, #fffefb);
+    /* border-bottom removed — 无黑色边线 */
+}
 .nav-btn { --md-text-button-label-text-color: var(--md-sys-color-on-surface-variant); }
 .nav-btn.active { --md-text-button-label-text-color: var(--md-sys-color-primary); }
 .nav-btn.active md-icon { color: var(--md-sys-color-primary); }
@@ -65,7 +90,7 @@ md-icon-button:hover .avatar-small {
     max-width: var(--content-max-width);
     margin: 0 auto;
     padding: 16px;
-    padding-top: 80px;
+    padding-top: 72px;
     min-height: 100vh;
 }
 
@@ -173,6 +198,52 @@ md-icon-button:hover .avatar-small {
 /* ===== 对话框通用 ===== */
 md-dialog {
     --md-dialog-container-shape: 20px;
+}
+
+/* 对话框加宽，增大内容/按钮与边框的间距 */
+md-dialog {
+    max-width: min(640px, calc(100% - 32px)) !important;
+}
+/* headline 与 content/actions 的间距 */
+md-dialog [slot="headline"] {
+    padding-left: 24px !important;
+    padding-top: 20px !important;
+    padding-bottom: 8px !important;
+}
+/* content 区域左右内边距加大 */
+md-dialog [slot="content"] {
+    padding: 8px 24px !important;
+}
+/* 底部按钮区域：与左右边距及底部边距加大 */
+md-dialog [slot="actions"] {
+    padding: 12px 24px 20px !important;
+    gap: 12px !important;
+}
+
+/* 所有按钮增加文字左右间距，避免中文按钮字紧贴边 */
+/* 注意：MWC 对有图标和没图标的按钮使用不同的 CSS 变量 */
+md-text-button,
+md-filled-button,
+md-outlined-button,
+md-filled-tonal-button {
+    /* 无图标：leading/trailing */
+    --md-text-button-leading-space: 24px;
+    --md-text-button-trailing-space: 24px;
+    --md-filled-button-leading-space: 24px;
+    --md-filled-button-trailing-space: 24px;
+    --md-outlined-button-leading-space: 24px;
+    --md-outlined-button-trailing-space: 24px;
+    --md-filled-tonal-button-leading-space: 24px;
+    --md-filled-tonal-button-trailing-space: 24px;
+    /* 有图标（左侧图标） */
+    --md-text-button-with-leading-icon-leading-space: 16px;
+    --md-text-button-with-leading-icon-trailing-space: 24px;
+    --md-filled-button-with-leading-icon-leading-space: 16px;
+    --md-filled-button-with-leading-icon-trailing-space: 24px;
+    --md-outlined-button-with-leading-icon-leading-space: 16px;
+    --md-outlined-button-with-leading-icon-trailing-space: 24px;
+    --md-filled-tonal-button-with-leading-icon-leading-space: 16px;
+    --md-filled-tonal-button-with-leading-icon-trailing-space: 24px;
 }
 md-dialog::backdrop {
     background: rgba(0,0,0,0.3);
@@ -290,7 +361,27 @@ md-dialog [slot="headline"] {
     font-size: 11px; color: var(--md-sys-color-on-surface-variant);
     margin-top: 2px;
 }
-.comment-input { width: 100%; }
+/* ===== 评论输入框（自定义 textarea） ===== */
+.comment-input {
+    width: 100%;
+    min-height: 56px;
+    resize: none;
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 12px 16px;
+    border: 2px solid #d0d0d0;
+    border-radius: 10px;
+    outline: none;
+    background: var(--md-sys-color-surface-container-low, #f7f2fa);
+    transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+.comment-input:focus {
+    background: #fff;
+    border-color: var(--md-sys-color-primary, #6750a4);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-sys-color-primary, #6750a4) 20%, transparent);
+}
 .comment-empty {
     text-align: center; padding: 20px;
     color: var(--md-sys-color-on-surface-variant);
@@ -373,13 +464,37 @@ md-dialog [slot="headline"] {
 /* ===== 响应式 ===== */
 @media (max-width: 720px) {
     .main-content { padding: 12px; padding-top: 72px; }
-    .nav-tabs .nav-btn { --md-text-button-container-height: 36px; }
+    .nav-btn { --md-text-button-container-height: 36px; }
     .post-card { border-radius: 12px; padding: 14px 16px; }
 }
 
 @media (max-width: 480px) {
-    .nav-tabs .nav-btn { min-width: auto; }
-    .nav-tabs .nav-btn span { display: none; }
-    .nav-tabs .nav-btn md-icon { margin: 0; }
+    .nav-btn { min-width: auto; }
+    .nav-btn span { display: none; }
+    .nav-btn md-icon { margin: 0; }
     .auth-btn span { display: none; }
+}
+
+/* ===== 发布对话框 - 加宽版 ===== */
+#composer-dialog {
+    max-width: min(800px, calc(100% - 32px)) !important;
+}
+
+#composer-dialog .composer-field {
+    min-height: 140px;
+    resize: none;
+    font-size: 16px;
+    line-height: 1.6;
+    padding: 16px 20px;
+    border: 2px solid #d0d0d0;
+    border-radius: 12px;
+    outline: none;
+    background: var(--md-sys-color-surface-container-low, #f7f2fa);
+    transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+#composer-dialog .composer-field:focus {
+    background: #fff;
+    border-color: var(--md-sys-color-primary, #6750a4);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-sys-color-primary, #6750a4) 20%, transparent);
 }

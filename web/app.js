@@ -6,7 +6,38 @@ import '@material/web/all.js';
 import {styles as typescaleStyles} from '@material/web/typography/md-typescale-styles.js';
 document.adoptedStyleSheets.push(typescaleStyles.styleSheet);
 
-// ===== 配置 =====
+// ===== 按钮间距修复：MWC 对中文按钮 padding 太窄，直接注入 shadow DOM =====
+function fixButtonPadding() {
+    const selectors = ['md-text-button', 'md-filled-button', 'md-outlined-button', 'md-filled-tonal-button'];
+    for (const sel of selectors) {
+        for (const btn of document.querySelectorAll(sel)) {
+            if (btn.shadowRoot && !btn.dataset.padFixed) {
+                btn.dataset.padFixed = '1';
+                const style = document.createElement('style');
+                // 有图标的按钮：leading 16px, trailing 24px
+                // 无图标的按钮：leading/trailing 各 24px
+                style.textContent = `
+                    :host([has-icon]:not([trailing-icon])) {
+                        padding-inline-start: 16px !important;
+                        padding-inline-end: 24px !important;
+                    }
+                    :host(:not([has-icon])) {
+                        padding-inline-start: 24px !important;
+                        padding-inline-end: 24px !important;
+                    }
+                `;
+                btn.shadowRoot.appendChild(style);
+            }
+        }
+    }
+}
+
+// 页面变化后重新修复新创建的按钮
+function setupPadObserver() {
+    const observer = new MutationObserver(() => fixButtonPadding());
+    observer.observe(document.body, { childList: true, subtree: true });
+    fixButtonPadding();
+}
 const API_BASE = '/api.php?route=';
 
 // ===== 状态管理 =====
@@ -114,9 +145,14 @@ function showToast(msg) {
 }
 
 // ===== MWC 对话框辅助 =====
+let dialogCount = 0;
+
 function dialogOpen(el) {
     if (el && typeof el.show === 'function') {
         el.show();
+        // 打开对话框时隐藏导航栏（避免 sticky 穿透遮罩层）
+        dialogCount++;
+        document.body.classList.add('dialog-open');
         // 修正：MWC md-dialog 内部 <dialog> 使用 margin:inherit，
         // 但 :host 的 display:contents 使继承链断裂(<dialog> 从 <body> 继承 margin:0)，
         // 导致对话框出现在左上角。此处强制设置 margin:auto。
@@ -130,7 +166,14 @@ function dialogOpen(el) {
     }
 }
 function dialogClose(el) {
-    if (el && typeof el.close === 'function') el.close();
+    if (el && typeof el.close === 'function') {
+        el.close();
+        dialogCount--;
+        if (dialogCount <= 0) {
+            dialogCount = 0;
+            document.body.classList.remove('dialog-open');
+        }
+    }
 }
 
 // ===== 认证 =====
@@ -738,7 +781,7 @@ function renderExplore() {
 // ===== 工具函数 =====
 function formatTime(dateStr) {
     if (!dateStr) return '';
-    const d = new Date(dateStr.replace(' ', 'T'));
+    const d = new Date(dateStr.replace(' ', 'T') + 'Z');
     const now = new Date();
     const diff = (now - d) / 1000;
 
@@ -781,6 +824,9 @@ async function init() {
     }
 
     console.log('CRMoment Web App 已启动');
+
+    // 修复按钮间距（在 DOM 填充完毕后执行）
+    setupPadObserver();
 }
 
 // 等待 DOM 加载后初始化
