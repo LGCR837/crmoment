@@ -508,13 +508,7 @@ function renderPostCard(post) {
 
 function renderImages(images) {
     if (!images || images.length === 0) return '';
-    const count = images.length;
-    let cls = 'post-images';
-    if (count === 1) cls += ' single';
-    else if (count === 2) cls += ' multi-2';
-    else if (count === 3) cls += ' multi-3';
-    else cls += ' multi-4';
-
+    const cls = images.length === 1 ? 'post-images single' : 'post-images';
     return `<div class="${cls}">${images.map(img => `<img src="${img}" alt="图片" loading="lazy">`).join('\n')}</div>`;
 }
 
@@ -665,15 +659,35 @@ dom.composerImagesInput.addEventListener('change', () => {
     selectedFiles = [...selectedFiles, ...newFiles];
     dom.imageCount.textContent = selectedFiles.length > 0 ? `${selectedFiles.length} 张图片` : '';
 
-    // 追加新图片预览
-    const newPreviews = newFiles.map(f => {
+    // 追加新图片预览（可点击删除）
+    const startIdx = selectedFiles.length - newFiles.length;
+    const newPreviews = newFiles.map((f, i) => {
         const url = URL.createObjectURL(f);
-        return `<img src="${url}" alt="">`;
+        return `<div class="preview-item" data-idx="${startIdx + i}">
+            <img src="${url}" alt="">
+            <div class="preview-remove">×</div>
+        </div>`;
     }).join('\n');
     dom.imagePreview.insertAdjacentHTML('beforeend', newPreviews);
 
     // 清空 input，允许重复选择同一文件
     dom.composerImagesInput.value = '';
+});
+
+// 点击预览图片删除
+dom.imagePreview.addEventListener('click', (e) => {
+    const item = e.target.closest('.preview-item');
+    if (!item) return;
+    const idx = parseInt(item.dataset.idx);
+    // 从 selectedFiles 中移除
+    selectedFiles.splice(idx, 1);
+    // 从 DOM 移除
+    item.remove();
+    // 更新后续预览的 data-idx
+    const items = dom.imagePreview.querySelectorAll('.preview-item');
+    items.forEach((el, i) => el.dataset.idx = i);
+    // 更新图片计数
+    dom.imageCount.textContent = selectedFiles.length > 0 ? `${selectedFiles.length} 张图片` : '';
 });
 
 dom.composerSubmit.addEventListener('click', async () => {
