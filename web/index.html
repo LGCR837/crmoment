@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRMoment - 朋友圈</title>
+
+    <!-- 防止 favicon 404 -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📱</text></svg>">
+
+    <!-- Material Icons 字体 -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,0&display=swap">
+    <!-- Roboto 字体 -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap">
+
+    <!-- MWC 组件通过 importmap 加载（与参考文件相同的 CDN） -->
+    <script type="importmap">
+    {
+        "imports": {
+            "@material/web/": "https://esm.run/@material/web/"
+        }
+    }
+    </script>
+
+    <!-- 使用 /web/ 绝对路径，避免无尾斜杠访问时解析错误 -->
+    <link rel="stylesheet" href="/web/style.css">
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <md-top-app-bar id="app-bar">
+        <md-icon-button slot="navigationIcon" id="btn-menu">
+            <md-icon>menu</md-icon>
+        </md-icon-button>
+        <div slot="headline" class="app-title">CRMoment</div>
+        <div slot="trailingIcons" class="nav-tabs">
+            <md-text-button class="nav-btn active" data-page="home">
+                <md-icon slot="icon">home</md-icon>
+                主页
+            </md-text-button>
+            <md-text-button class="nav-btn" data-page="profile" id="nav-profile" style="display:none">
+                <md-icon slot="icon">person</md-icon>
+                我的
+            </md-text-button>
+            <md-text-button class="nav-btn" data-page="explore">
+                <md-icon slot="icon">explore</md-icon>
+                发现
+            </md-text-button>
+        </div>
+        <div slot="trailingIcons" class="nav-auth" id="nav-auth">
+            <md-filled-tonal-button id="btn-login" class="auth-btn">
+                <md-icon slot="icon">login</md-icon>
+                登录
+            </md-filled-tonal-button>
+        </div>
+        <div slot="trailingIcons" class="nav-user" id="nav-user" style="display:none">
+            <md-icon-button id="btn-notifications" class="notif-btn">
+                <md-icon>notifications</md-icon>
+                <md-badge id="notif-badge" style="display:none"></md-badge>
+            </md-icon-button>
+            <md-icon-button id="btn-user-avatar">
+                <img id="user-avatar-img" src="/uploads/avatars/default.svg" alt="" class="avatar-small">
+            </md-icon-button>
+        </div>
+    </md-top-app-bar>
+
+    <!-- 主内容区 -->
+    <main class="main-content" id="main-content">
+        <!-- 由 app.js 动态渲染 -->
+    </main>
+
+    <!-- 登录/注册对话框 -->
+    <md-dialog id="auth-dialog">
+        <div slot="headline" id="auth-title">登录</div>
+        <form slot="content" id="auth-form" method="dialog">
+            <div class="auth-tabs">
+                <md-text-button id="auth-tab-login" class="auth-tab active">登录</md-text-button>
+                <md-text-button id="auth-tab-register" class="auth-tab">注册</md-text-button>
+            </div>
+            <md-outlined-text-field
+                id="auth-username"
+                label="用户名"
+                type="text"
+                required
+                minlength="2"
+                maxlength="50"
+                autocomplete="username"
+                class="auth-field"
+            ></md-outlined-text-field>
+            <md-outlined-text-field
+                id="auth-password"
+                label="密码"
+                type="password"
+                required
+                minlength="6"
+                autocomplete="current-password"
+                class="auth-field"
+            ></md-outlined-text-field>
+            <div id="auth-error" class="error-message" style="display:none"></div>
+        </form>
+        <div slot="actions">
+            <md-text-button id="auth-cancel">取消</md-text-button>
+            <md-filled-button id="auth-submit">登录</md-filled-button>
+        </div>
+    </md-dialog>
+
+    <!-- 发布动态对话框 -->
+    <md-dialog id="composer-dialog">
+        <div slot="headline">发布动态</div>
+        <form slot="content" id="composer-form" method="dialog">
+            <md-outlined-textarea
+                id="composer-content"
+                label="说点什么..."
+                rows="4"
+                maxlength="2000"
+                class="composer-field"
+            ></md-outlined-textarea>
+            <div class="composer-tools">
+                <md-icon-button id="btn-add-image" title="添加图片">
+                    <md-icon>add_photo_alternate</md-icon>
+                </md-icon-button>
+                <input type="file" id="composer-images-input" accept="image/*" multiple style="display:none">
+                <span id="image-count" class="image-count"></span>
+            </div>
+            <div id="image-preview" class="image-preview"></div>
+        </form>
+        <div slot="actions">
+            <md-text-button id="composer-cancel">取消</md-text-button>
+            <md-filled-button id="composer-submit">发布</md-filled-button>
+        </div>
+    </md-dialog>
+
+    <!-- 通知对话框 -->
+    <md-dialog id="notif-dialog">
+        <div slot="headline">通知</div>
+        <div slot="content" id="notif-list" class="notif-list"></div>
+        <div slot="actions">
+            <md-text-button id="notif-read-all">全部已读</md-text-button>
+            <md-text-button id="notif-close">关闭</md-text-button>
+        </div>
+    </md-dialog>
+
+    <!-- 评论对话框 -->
+    <md-dialog id="comment-dialog">
+        <div slot="headline" id="comment-title">评论</div>
+        <div slot="content">
+            <div id="comment-list" class="comment-list"></div>
+            <md-outlined-textarea
+                id="comment-input"
+                label="写评论..."
+                rows="2"
+                class="comment-input"
+            ></md-outlined-textarea>
+        </div>
+        <div slot="actions">
+            <md-text-button id="comment-cancel">关闭</md-text-button>
+            <md-filled-button id="comment-submit">发送</md-filled-button>
+        </div>
+    </md-dialog>
+
+    <!-- 图片查看器 -->
+    <md-dialog id="image-viewer-dialog" class="image-viewer-dialog">
+        <div slot="content">
+            <img id="image-viewer-img" src="" alt="" class="image-viewer-img">
+        </div>
+        <div slot="actions">
+            <md-text-button id="image-viewer-close">关闭</md-text-button>
+        </div>
+    </md-dialog>
+
+    <!-- MWC 初始化 + 应用入口（使用绝对路径） -->
+    <script type="module" src="/web/app.js"></script>
+</body>
+</html>
