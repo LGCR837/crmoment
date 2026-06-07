@@ -106,14 +106,14 @@
     <!-- 发布动态对话框 -->
     <md-dialog id="composer-dialog">
         <div slot="headline">发布动态</div>
-        <form slot="content" id="composer-form" method="dialog">
-            <md-outlined-textarea
+        <form slot="content" id="composer-form">
+            <textarea
                 id="composer-content"
-                label="说点什么..."
+                class="composer-field"
+                placeholder="说点什么..."
                 rows="4"
                 maxlength="2000"
-                class="composer-field"
-            ></md-outlined-textarea>
+            ></textarea>
             <div class="composer-tools">
                 <md-icon-button id="btn-add-image" title="添加图片">
                     <md-icon>add_photo_alternate</md-icon>

@@ -177,7 +177,13 @@ md-dialog {
 md-dialog::backdrop {
     background: rgba(0,0,0,0.3);
 }
-md-dialog form { display: flex; flex-direction: column; gap: 16px; min-width: 320px; }
+md-dialog form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: unset;        /* 取消强制最小宽度，让内容自然撑开 */
+    width: 100%;
+}
 /* 对话框内标签文本缩小 */
 md-dialog md-outlined-text-field,
 md-dialog md-outlined-textarea {
@@ -188,9 +194,11 @@ md-dialog md-outlined-textarea {
     --md-outlined-textarea-input-text-size: 14px;
     --md-outlined-textarea-supporting-text-size: 12px;
 }
-/* 对话框标题缩小 */
+/* 对话框标题缩小并适当内缩 */
 md-dialog [slot="headline"] {
     font-size: 18px;
+    padding-left: 16px;
+    padding-top: 8px;
 }
 
 /* ===== 登录对话框 ===== */
@@ -207,7 +215,31 @@ md-dialog [slot="headline"] {
 }
 
 /* ===== 发布对话框 ===== */
-.composer-field { width: 100%; }
+.composer-field {
+    width: 100%;
+    min-height: 120px;
+    flex-shrink: 0;
+    padding: 12px 16px;
+    font-size: 15px;
+    font-family: inherit;
+    line-height: 1.5;
+    border: 1px solid var(--md-sys-color-outline, #79747e);
+    border-radius: 8px;
+    outline: none;
+    resize: vertical;
+    background: transparent;
+    color: var(--md-sys-color-on-surface, #1d1b20);
+    box-sizing: border-box;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.composer-field:focus {
+    border-color: var(--md-sys-color-primary, #6750a4);
+    border-width: 2px;
+    padding: 11px 15px;  /* 保持总高度不变 */
+}
+.composer-field::placeholder {
+    color: var(--md-sys-color-on-surface-variant, #49454f);
+}
 .composer-tools { display: flex; align-items: center; gap: 8px; }
 .image-count { font-size: 13px; color: var(--md-sys-color-on-surface-variant); }
 .image-preview {

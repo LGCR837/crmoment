@@ -115,7 +115,19 @@ function showToast(msg) {
 
 // ===== MWC 对话框辅助 =====
 function dialogOpen(el) {
-    if (el && typeof el.show === 'function') el.show();
+    if (el && typeof el.show === 'function') {
+        el.show();
+        // 修正：MWC md-dialog 内部 <dialog> 使用 margin:inherit，
+        // 但 :host 的 display:contents 使继承链断裂(<dialog> 从 <body> 继承 margin:0)，
+        // 导致对话框出现在左上角。此处强制设置 margin:auto。
+        requestAnimationFrame(() => {
+            const dlg = el.shadowRoot?.querySelector('dialog');
+            if (dlg) {
+                dlg.style.margin = 'auto';
+                dlg.style.maxWidth = '560px';
+            }
+        });
+    }
 }
 function dialogClose(el) {
     if (el && typeof el.close === 'function') el.close();
@@ -482,7 +494,8 @@ dom.commentCancel.addEventListener('click', () => dialogClose(dom.commentDialog)
 // ===== 发布动态 =====
 let selectedFiles = [];
 
-dom.btnAddImage.addEventListener('click', () => {
+dom.btnAddImage.addEventListener('click', (e) => {
+    e.preventDefault();
     dom.composerImagesInput.click();
 });
 
