@@ -201,6 +201,8 @@ md-icon-button:hover .avatar-small {
 .post-actions .action-btn:hover { background: #f0ebff; }
 .post-actions .action-btn.liked { color: #e91e63; }
 .post-actions .action-btn.liked md-icon { color: #e91e63; font-variation-settings: 'FILL' 1; }
+.post-actions .action-btn.recall-btn { color: #b3261e; }
+.post-actions .action-btn.recall-btn:hover { background: #fce4ec; }
 
 /* ===== 动态加载提示 ===== */
 .loading-indicator {

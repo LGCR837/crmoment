@@ -420,6 +420,21 @@ function renderPosts(container) {
             });
         });
     });
+    container.querySelectorAll('.recall-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const postId = btn.dataset.postId;
+            if (!confirm('确定撤回这条动态？')) return;
+            try {
+                await api('DELETE', `/posts/${postId}`);
+                showToast('已撤回');
+                btn.closest('.post-card').remove();
+                const idx = state.posts.findIndex(p => p.id == postId);
+                if (idx !== -1) state.posts.splice(idx, 1);
+            } catch (e) {
+                showToast(e.message);
+            }
+        });
+    });
     container.querySelectorAll('.post-images img').forEach(img => {
         img.addEventListener('click', () => openImageViewer(img.src));
     });
@@ -440,6 +455,25 @@ function renderPostCard(post) {
     const imageHtml = renderImages(images);
     const likedClass = post.is_liked ? 'liked' : '';
     const postUrl = `https://crmoment.ccwu.cc/web#${post.id}`;
+
+    // 判断是否可撤回（自己的动态 & 8 分钟内）
+    let canRecall = false;
+    if (state.user) {
+        const isOwner = String(post.user_id) === String(state.user.id);
+        console.log('🔍 recall check:', { postId: post.id, postUserId: post.user_id, myUserId: state.user.id, isOwner, createdAt: post.created_at });
+        if (isOwner) {
+            const postTime = new Date(post.created_at?.replace(' ', 'T') + 'Z').getTime();
+            const ageMs = Date.now() - postTime;
+            const ageMin = Math.floor(ageMs / 60000);
+            console.log('⏱ recall time:', { postTime, ageMs, ageMin, within8min: ageMs < 8 * 60 * 1000 });
+            canRecall = ageMs < 8 * 60 * 1000;
+        }
+    }
+    const recallHtml = canRecall ? `
+            <button class="action-btn recall-btn" data-post-id="${post.id}">
+                <md-icon>undo</md-icon>
+                <span>撤回</span>
+            </button>` : '';
 
     return `
     <div class="post-card" data-post-id="${post.id}">
@@ -462,6 +496,7 @@ function renderPostCard(post) {
                 <md-icon>chat_bubble_outline</md-icon>
                 <span>${post.comments_count || 0}</span>
             </button>
+            ${recallHtml}
             <button class="action-btn share-btn" data-url="${postUrl}">
                 <md-icon>share</md-icon>
                 <span>分享</span>
@@ -619,14 +654,25 @@ dom.btnAddImage.addEventListener('click', (e) => {
 });
 
 dom.composerImagesInput.addEventListener('change', () => {
-    const files = Array.from(dom.composerImagesInput.files).slice(0, 9);
-    selectedFiles = files;
-    dom.imageCount.textContent = files.length > 0 ? `${files.length} 张图片` : '';
+    const remain = 9 - selectedFiles.length;
+    if (remain <= 0) {
+        showToast('最多选择 9 张图片');
+        dom.composerImagesInput.value = '';
+        return;
+    }
+    const newFiles = Array.from(dom.composerImagesInput.files).slice(0, remain);
+    selectedFiles = [...selectedFiles, ...newFiles];
+    dom.imageCount.textContent = selectedFiles.length > 0 ? `${selectedFiles.length} 张图片` : '';
 
-    dom.imagePreview.innerHTML = files.map(f => {
+    // 追加新图片预览
+    const newPreviews = newFiles.map(f => {
         const url = URL.createObjectURL(f);
         return `<img src="${url}" alt="">`;
     }).join('\n');
+    dom.imagePreview.insertAdjacentHTML('beforeend', newPreviews);
+
+    // 清空 input，允许重复选择同一文件
+    dom.composerImagesInput.value = '';
 });
 
 dom.composerSubmit.addEventListener('click', async () => {
@@ -713,13 +759,36 @@ async function loadNotifications() {
                              n.type === 'comment' ? '评论了你的动态' :
                              '回复了你的评论';
                 return `
-                <div class="notif-item ${n.is_read ? '' : 'unread'}">
+                <div class="notif-item ${n.is_read ? '' : 'unread'}" data-post-id="${n.post_id || ''}">
                     <div class="notif-text">
                         <strong>${escapeHtml(n.actor_username)}</strong> ${text}
                     </div>
                     <div class="notif-time">${formatTime(n.created_at)}</div>
                 </div>`;
             }).join('\n');
+
+            // 点击通知跳转到对应动态
+            dom.notifList.querySelectorAll('.notif-item').forEach(el => {
+                el.style.cursor = 'pointer';
+                el.addEventListener('click', () => {
+                    const postId = el.dataset.postId;
+                    if (!postId) return;
+                    dialogClose(dom.notifDialog);
+                    navigateTo('home');
+                    // 等主页渲染完成后滚动到目标动态
+                    const scrollTimer = setInterval(() => {
+                        const target = document.querySelector(`.post-card[data-post-id="${postId}"]`);
+                        if (target) {
+                            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            target.style.boxShadow = '0 0 0 3px var(--md-sys-color-primary, #6750a4), var(--md-elevation-level2)';
+                            setTimeout(() => { target.style.boxShadow = ''; }, 3000);
+                            clearInterval(scrollTimer);
+                        }
+                    }, 200);
+                    // 5 秒超时停止轮询
+                    setTimeout(() => clearInterval(scrollTimer), 5000);
+                });
+            });
         }
         // 更新未读数量
         await checkUnread();
@@ -862,6 +931,21 @@ async function renderProfile() {
             $('#my-posts').querySelectorAll('.comment-btn').forEach(btn => {
                 btn.addEventListener('click', () => openComments(btn.dataset.postId));
             });
+            $('#my-posts').querySelectorAll('.recall-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const postId = btn.dataset.postId;
+                    if (!confirm('确定撤回这条动态？')) return;
+                    try {
+                        await api('DELETE', `/posts/${postId}`);
+                        showToast('已撤回');
+                        btn.closest('.post-card').remove();
+                        const idx = state.posts.findIndex(p => p.id == postId);
+                        if (idx !== -1) state.posts.splice(idx, 1);
+                    } catch (e) {
+                        showToast(e.message);
+                    }
+                });
+            });
             $('#my-posts').querySelectorAll('.post-images img').forEach(img => {
                 img.addEventListener('click', () => openImageViewer(img.src));
             });
@@ -931,6 +1015,21 @@ async function renderUserProfile(userId) {
             });
             container.querySelectorAll('.comment-btn').forEach(btn => {
                 btn.addEventListener('click', () => openComments(btn.dataset.postId));
+            });
+            container.querySelectorAll('.recall-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const postId = btn.dataset.postId;
+                    if (!confirm('确定撤回这条动态？')) return;
+                    try {
+                        await api('DELETE', `/posts/${postId}`);
+                        showToast('已撤回');
+                        btn.closest('.post-card').remove();
+                        const idx = state.posts.findIndex(p => p.id == postId);
+                        if (idx !== -1) state.posts.splice(idx, 1);
+                    } catch (e) {
+                        showToast(e.message);
+                    }
+                });
             });
             container.querySelectorAll('.post-images img').forEach(img => {
                 img.addEventListener('click', () => openImageViewer(img.src));

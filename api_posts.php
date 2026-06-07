@@ -199,7 +199,7 @@ function handlePostsDelete(int $id): void {
     $userId = requireLogin();
 
     $pdo  = getDB();
-    $stmt = $pdo->prepare('SELECT user_id, images FROM posts WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT user_id, images, created_at FROM posts WHERE id = ?');
     $stmt->execute([$id]);
     $post = $stmt->fetch();
 
@@ -208,6 +208,12 @@ function handlePostsDelete(int $id): void {
     }
     if ((int)$post['user_id'] !== $userId) {
         error('无权删除此动态', 403);
+    }
+
+    // 8 分钟撤回时限
+    $createdAt = strtotime($post['created_at'] . ' UTC');
+    if (!$createdAt || time() - $createdAt > 480) {
+        error('已超过 8 分钟，无法撤回', 403);
     }
 
     // 删除关联图片文件
