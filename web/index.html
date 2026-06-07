@@ -27,8 +27,14 @@
 <body>
     <!-- 顶部导航栏（粘性，标题左，登录/通知/头像右，在对话框遮罩下方） -->
     <header id="app-bar">
-        <a href="/" class="app-title-link"><img src="/web/crmomentlogo.png" alt="CRMoment" class="app-title"></a>
+        <a href="/" class="app-title-link">
+            <img src="/web/crmomentlogo.png" alt="CRMoment" class="app-title app-title-light">
+            <img src="/web/crmomentlogodark.png" alt="CRMoment" class="app-title app-title-dark" style="display:none">
+        </a>
         <div class="top-bar-right">
+            <md-icon-button id="btn-theme-toggle" title="切换主题">
+                <md-icon>light_mode</md-icon>
+            </md-icon-button>
             <div class="nav-auth" id="nav-auth">
                 <md-filled-tonal-button id="btn-login" class="auth-btn">
                     <md-icon slot="icon">login</md-icon>

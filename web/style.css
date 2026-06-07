@@ -7,6 +7,7 @@
     --md-sys-color-on-primary-container: #21005d;
     --md-sys-color-secondary: #625b71;
     --md-sys-color-surface: #fef7ff;
+    --md-sys-color-surface-container-low: #f7f2fa;
     --md-sys-color-on-surface: #1d1b20;
     --md-sys-color-on-surface-variant: #49454f;
     --md-sys-color-outline: #79747e;
@@ -15,6 +16,111 @@
     --md-elevation-level2: 0 3px 6px rgba(0,0,0,0.14), 0 2px 4px rgba(0,0,0,0.10);
     --md-elevation-level3: 0 6px 12px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.12);
     --content-max-width: 680px;
+}
+
+/* ===== 深色模式 ===== */
+[data-theme="dark"] {
+    --md-sys-color-primary: #d0bcff;
+    --md-sys-color-on-primary: #381e72;
+    --md-sys-color-primary-container: #4f378b;
+    --md-sys-color-on-primary-container: #eaddff;
+    --md-sys-color-secondary: #ccc2dc;
+    --md-sys-color-surface: #141218;
+    --md-sys-color-surface-container-low: #1e1c22;
+    --md-sys-color-surface-container: #211f26;
+    --md-sys-color-surface-container-high: #2a2730;
+    --md-sys-color-on-surface: #e6e0e9;
+    --md-sys-color-on-surface-variant: #cac4d0;
+    --md-sys-color-outline: #938f99;
+    --md-sys-color-error: #f2b8b5;
+    --md-elevation-level1: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+    --md-elevation-level2: 0 3px 6px rgba(0,0,0,0.48), 0 2px 4px rgba(0,0,0,0.36);
+    --md-elevation-level3: 0 6px 12px rgba(0,0,0,0.52), 0 3px 6px rgba(0,0,0,0.4);
+}
+
+[data-theme="dark"] body {
+    background: #141218;
+}
+
+[data-theme="dark"] * {
+    scrollbar-color: #3a3640 #1e1c22;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-track {
+    background: #1e1c22;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+    background: #3a3640;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+    background: #4e4a57;
+}
+
+[data-theme="dark"] #app-bar {
+    border-bottom: 1px solid #2d2a33;
+}
+
+
+[data-theme="dark"] .post-avatar {
+    background: #333;
+}
+
+[data-theme="dark"] .post-actions {
+    border-top-color: #2d2a33;
+}
+
+[data-theme="dark"] .post-actions .action-btn:hover {
+    background: #2a2640;
+}
+
+[data-theme="dark"] .post-actions .action-btn.recall-btn:hover {
+    background: #3a2020;
+}
+
+
+[data-theme="dark"] .notif-item {
+    border-bottom-color: #2d2a33;
+}
+
+[data-theme="dark"] .comment-item {
+    border-bottom-color: #2d2a33;
+}
+
+[data-theme="dark"] .comment-item .comment-avatar {
+    background: #333;
+}
+
+[data-theme="dark"] .comment-input {
+    border-color: #3a3640;
+    background: #1e1c22;
+}
+
+[data-theme="dark"] .comment-input:focus {
+    background: #1e1c22;
+    border-color: var(--md-sys-color-primary, #d0bcff);
+}
+
+[data-theme="dark"] .skeleton {
+    background: linear-gradient(90deg, #2a2730 25%, #33303a 50%, #2a2730 75%);
+    background-size: 200% 100%;
+}
+
+[data-theme="dark"] .app-title-light { display: none !important; }
+[data-theme="dark"] .app-title-dark  { display: inline !important; }
+
+[data-theme="dark"] md-dialog {
+    --md-dialog-container-color: #1e1c22;
+}
+
+[data-theme="dark"] #composer-dialog .composer-field {
+    border-color: #3a3640;
+    background: #141218;
+}
+
+[data-theme="dark"] #composer-dialog .composer-field:focus {
+    background: #141218;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -49,6 +155,7 @@ html, body {
     color: var(--md-sys-color-on-surface);
     height: 100%;
     -webkit-font-smoothing: antialiased;
+    transition: background 0.35s ease, color 0.35s ease;
 }
 
 /* ===== 顶部导航栏（粘性，始终可见） ===== */
@@ -64,6 +171,7 @@ html, body {
     background: var(--md-sys-color-surface, #fef7ff);
     border-bottom: 1px solid #e0e0e0;
     box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    transition: background 0.35s ease, border-color 0.35s ease;
 }
 
 /* 对话框打开时降低导航栏 z-index，使 MWC dialog shadow DOM 中的遮罩层盖过导航栏 */
@@ -120,12 +228,12 @@ md-icon-button:hover .avatar-small {
 
 /* ===== 动态卡片 ===== */
 .post-card {
-    background: #ffffff;
+    background: var(--md-sys-color-surface-container-low, #f7f2fa);
     border-radius: 16px;
     padding: 16px 20px;
     margin-bottom: 16px;
     box-shadow: var(--md-elevation-level1);
-    transition: box-shadow 0.2s;
+    transition: box-shadow 0.2s, background 0.35s ease;
     animation: fadeIn 0.3s ease;
 }
 .post-card:hover { box-shadow: var(--md-elevation-level2); }
@@ -144,6 +252,7 @@ md-icon-button:hover .avatar-small {
     width: 40px; height: 40px; border-radius: 50%;
     object-fit: cover; background: #e0e0e0;
     cursor: pointer;
+    transition: background 0.35s ease;
 }
 
 .post-author {
@@ -189,6 +298,7 @@ md-icon-button:hover .avatar-small {
 .post-actions {
     display: flex; align-items: center; gap: 4px;
     padding-top: 8px; border-top: 1px solid #f0f0f0;
+    transition: border-color 0.35s ease;
 }
 .post-actions .action-btn {
     display: flex; align-items: center; gap: 4px;
@@ -216,11 +326,12 @@ md-icon-button:hover .avatar-small {
 
 /* ===== 写动态区 ===== */
 .composer-card {
-    background: #ffffff; border-radius: 16px;
+    background: var(--md-sys-color-surface-container-low, #f7f2fa); border-radius: 16px;
     padding: 16px; margin-bottom: 20px;
     box-shadow: var(--md-elevation-level1);
     display: flex; align-items: center; gap: 12px;
-    cursor: pointer; transition: box-shadow 0.2s;
+    cursor: pointer;
+    transition: box-shadow 0.2s, background 0.35s ease;
 }
 .composer-card:hover { box-shadow: var(--md-elevation-level2); }
 .composer-card .composer-placeholder {
@@ -360,6 +471,7 @@ md-dialog [slot="headline"] {
 .notif-item {
     display: flex; align-items: center; gap: 12px;
     padding: 12px 0; border-bottom: 1px solid #f0f0f0;
+    transition: border-color 0.35s ease;
 }
 .notif-item:last-child { border-bottom: none; }
 .notif-item .notif-text { flex: 1; font-size: 14px; line-height: 1.4; }
@@ -375,12 +487,14 @@ md-dialog [slot="headline"] {
 .comment-item {
     display: flex; gap: 10px; padding: 10px 0;
     border-bottom: 1px solid #f5f5f5;
+    transition: border-color 0.35s ease;
 }
 .comment-item:last-child { border-bottom: none; }
 .comment-item .comment-avatar {
     width: 32px; height: 32px; border-radius: 50%;
     object-fit: cover; background: #e0e0e0;
     flex-shrink: 0; cursor: pointer;
+    transition: background 0.35s ease;
 }
 .comment-item .comment-body { flex: 1; }
 .comment-item .comment-author {

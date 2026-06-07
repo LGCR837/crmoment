@@ -77,6 +77,7 @@ const dom = {
     userAvatarImg: $('#user-avatar-img'),
     btnNotifications: $('#btn-notifications'),
     notifBadge: $('#notif-badge'),
+    btnThemeToggle: $('#btn-theme-toggle'),
     notifDialog: $('#notif-dialog'),
     notifList: $('#notif-list'),
     notifReadAll: $('#notif-read-all'),
@@ -1143,6 +1144,22 @@ async function init() {
         await checkUnread();
         setInterval(checkUnread, 30000);
     }
+
+    // ===== 深色/浅色模式切换 =====
+    const themeToggle = dom.btnThemeToggle;
+    const themeIcon = themeToggle.querySelector('md-icon');
+    // 读取已保存的主题偏好
+    const savedTheme = localStorage.getItem('crmoment-theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    themeIcon.textContent = savedTheme === 'dark' ? 'dark_mode' : 'light_mode';
+
+    themeToggle.addEventListener('click', () => {
+        const current = document.documentElement.getAttribute('data-theme');
+        const next = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        themeIcon.textContent = next === 'dark' ? 'dark_mode' : 'light_mode';
+        localStorage.setItem('crmoment-theme', next);
+    });
 
     console.log('CRMoment Web App 已启动');
 
