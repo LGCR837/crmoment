@@ -488,6 +488,38 @@ function renderPosts(container) {
     });
 }
 
+// ===== 跳转到指定动态（支持懒加载） =====
+async function scrollToPost(postId) {
+    // 先检查是否已在 DOM 中
+    let target = document.querySelector(`.post-card[data-post-id="${postId}"]`);
+    if (!target) {
+        // 尝试从 API 获取单条动态
+        try {
+            const post = await api('GET', `/posts/${postId}`);
+            // 如果已在列表里则更新，否则插入到最前面
+            const idx = state.posts.findIndex(p => p.id == postId);
+            if (idx !== -1) {
+                state.posts[idx] = post;
+            } else {
+                state.posts.unshift(post);
+            }
+            const feed = $('#post-feed');
+            if (feed) renderPosts(feed);
+        } catch (e) {
+            showToast('无法找到该动态');
+            return;
+        }
+        target = document.querySelector(`.post-card[data-post-id="${postId}"]`);
+        if (!target) {
+            showToast('无法定位到该动态');
+            return;
+        }
+    }
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.style.boxShadow = '0 0 0 3px var(--md-sys-color-primary, #6750a4), var(--md-elevation-level2)';
+    setTimeout(() => { target.style.boxShadow = ''; }, 3000);
+}
+
 function renderPostCard(post) {
     const time = formatTime(post.created_at);
     const images = post.images || [];
@@ -807,18 +839,38 @@ async function loadNotifications() {
         if (data.list.length === 0) {
             dom.notifList.innerHTML = '<div class="notif-empty">暂无通知</div>';
         } else {
-            dom.notifList.innerHTML = data.list.map(n => {
-                const text = n.type === 'like' ? '赞了你的动态' :
-                             n.type === 'comment' ? '评论了你的动态' :
-                             '回复了你的评论';
-                return `
-                <div class="notif-item ${n.is_read ? '' : 'unread'}" data-post-id="${n.post_id || ''}">
-                    <div class="notif-text">
-                        <strong>${escapeHtml(n.actor_nickname || n.actor_username)}</strong> ${text}
-                    </div>
-                    <div class="notif-time">${formatTime(n.created_at)}</div>
-                </div>`;
-            }).join('\n');
+            // 分组：未读和已读
+            const unread = data.list.filter(n => !n.is_read);
+            const read = data.list.filter(n => n.is_read);
+
+            function renderNotifItems(items) {
+                return items.map(n => {
+                    const text = n.type === 'like' ? '赞了你的动态' :
+                                 n.type === 'comment' ? '评论了你的动态' :
+                                 '回复了你的评论';
+                    return `
+                    <div class="notif-item ${n.is_read ? '' : 'unread'}" data-post-id="${n.post_id || ''}">
+                        <div class="notif-text">
+                            <strong>${escapeHtml(n.actor_nickname || n.actor_username)}</strong> ${text}
+                        </div>
+                        <div class="notif-time">${formatTime(n.created_at)}</div>
+                    </div>`;
+                }).join('\n');
+            }
+
+            let html = '';
+            if (unread.length > 0) {
+                html += '<div class="notif-section-title">未读</div>';
+                html += renderNotifItems(unread);
+            }
+            if (unread.length > 0 && read.length > 0) {
+                html += '<div class="notif-divider"></div>';
+            }
+            if (read.length > 0) {
+                html += '<div class="notif-section-title">已读</div>';
+                html += renderNotifItems(read);
+            }
+            dom.notifList.innerHTML = html;
 
             // 点击通知跳转到对应动态
             dom.notifList.querySelectorAll('.notif-item').forEach(el => {
@@ -828,18 +880,7 @@ async function loadNotifications() {
                     if (!postId) return;
                     dialogClose(dom.notifDialog);
                     navigateTo('home');
-                    // 等主页渲染完成后滚动到目标动态
-                    const scrollTimer = setInterval(() => {
-                        const target = document.querySelector(`.post-card[data-post-id="${postId}"]`);
-                        if (target) {
-                            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            target.style.boxShadow = '0 0 0 3px var(--md-sys-color-primary, #6750a4), var(--md-elevation-level2)';
-                            setTimeout(() => { target.style.boxShadow = ''; }, 3000);
-                            clearInterval(scrollTimer);
-                        }
-                    }, 200);
-                    // 5 秒超时停止轮询
-                    setTimeout(() => clearInterval(scrollTimer), 5000);
+                    scrollToPost(postId);
                 });
             });
         }
@@ -1211,14 +1252,7 @@ async function init() {
     // 检查 hash 定位到指定动态
     const hash = window.location.hash.slice(1);
     if (hash && /^\d+$/.test(hash)) {
-        const target = document.querySelector(`.post-card[data-post-id="${hash}"]`);
-        if (target) {
-            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            target.style.boxShadow = '0 0 0 3px var(--md-sys-color-primary, #6750a4), var(--md-elevation-level2)';
-            setTimeout(() => {
-                target.style.boxShadow = '';
-            }, 3000);
-        }
+        await scrollToPost(hash);
     }
 
     // 定时检查未读通知
@@ -1227,20 +1261,42 @@ async function init() {
         setInterval(checkUnread, 30000);
     }
 
-    // ===== 深色/浅色模式切换 =====
+    // ===== 深色/浅色模式切换（支持设备系统自动适配） =====
     const themeToggle = dom.btnThemeToggle;
     const themeIcon = themeToggle.querySelector('md-icon');
-    // 读取已保存的主题偏好
-    const savedTheme = localStorage.getItem('crmoment-theme') || 'light';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    themeIcon.textContent = savedTheme === 'dark' ? 'dark_mode' : 'light_mode';
 
+    /** 获取当前应使用的主题：优先使用用户手动保存的，否则跟随系统 */
+    function getEffectiveTheme() {
+        const saved = localStorage.getItem('crmoment-theme');
+        if (saved === 'dark' || saved === 'light') return saved;
+        // 没有保存过 → 跟随系统
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
+    /** 应用主题到页面 */
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        themeIcon.textContent = theme === 'dark' ? 'dark_mode' : 'light_mode';
+    }
+
+    // 初始化主题
+    applyTheme(getEffectiveTheme());
+
+    // 用户手动切换
     themeToggle.addEventListener('click', () => {
         const current = document.documentElement.getAttribute('data-theme');
         const next = current === 'dark' ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', next);
-        themeIcon.textContent = next === 'dark' ? 'dark_mode' : 'light_mode';
+        applyTheme(next);
         localStorage.setItem('crmoment-theme', next);
+    });
+
+    // 监听系统主题变化（设备自动切换深色/浅色时实时响应）
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        // 仅当用户没有手动存储过偏好时才跟随系统
+        const saved = localStorage.getItem('crmoment-theme');
+        if (saved !== 'dark' && saved !== 'light') {
+            applyTheme(e.matches ? 'dark' : 'light');
+        }
     });
 
     console.log('CRMoment Web App 已启动');
