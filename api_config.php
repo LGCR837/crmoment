@@ -1,6 +1,6 @@
 <?php
 /**
- * CRMoment - 数据库与 Session 配置
+ * CRMoment - 数据库与基本配置
  */
 
 // 修改为你的数据库连接信息
@@ -35,21 +35,4 @@ function getDB(): PDO {
         ]);
     }
     return $pdo;
-}
-
-/**
- * 启动 Session（配置安全 Cookie）
- */
-function initSession(): void {
-    if (session_status() === PHP_SESSION_ACTIVE) return;
-
-    session_set_cookie_params([
-        'lifetime' => 0,
-        'path'     => '/',
-        'domain'   => '',
-        'secure'   => true,
-        'httponly' => true,
-        'samesite' => 'Lax',
-    ]);
-    session_start();
 }

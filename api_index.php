@@ -15,9 +15,6 @@ require_once __DIR__ . '/api_comments.php';
 require_once __DIR__ . '/api_notifications.php';
 require_once __DIR__ . '/api_upload.php';
 
-// 初始化 Session
-initSession();
-
 // 解析请求路径
 $method = $_SERVER['REQUEST_METHOD'];
 

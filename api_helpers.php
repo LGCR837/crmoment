@@ -37,19 +37,94 @@ function error(string $message, int $httpCode = 400) {
  * 获取当前登录用户 ID，未登录则中断
  */
 function requireLogin(): int {
-    $userId = $_SESSION['user_id'] ?? null;
-    if (!$userId) {
+    $token = getTokenFromRequest();
+    if (!$token) {
         error('请先登录', 401);
     }
-    return (int)$userId;
+    $userId = validateToken($token);
+    if (!$userId) {
+        error('登录已过期，请重新登录', 401);
+    }
+    return $userId;
 }
 
 /**
  * 获取当前登录用户 ID，未登录返回 null（不中断）
  */
 function getCurrentUserId(): ?int {
-    $userId = $_SESSION['user_id'] ?? null;
-    return $userId ? (int)$userId : null;
+    $token = getTokenFromRequest();
+    if (!$token) {
+        return null;
+    }
+    $userId = validateToken($token);
+    return $userId ?: null;
+}
+
+/**
+ * 从请求中获取 Token
+ * 优先从 Authorization: Bearer xxx 头部获取
+ */
+function getTokenFromRequest(): ?string {
+    $header = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['Authorization'] ?? '';
+    if (preg_match('/^Bearer\s+(.+)$/i', $header, $m)) {
+        return $m[1];
+    }
+    // 也支持 GET/POST 参数方式（用于某些特殊场景）
+    return $_GET['token'] ?? $_POST['token'] ?? null;
+}
+
+/**
+ * 验证 Token 有效性，并延期（更新 last_used_at）
+ * 返回 user_id 或 null
+ */
+function validateToken(string $token): ?int {
+    $pdo = getDB();
+    $stmt = $pdo->prepare(
+        'SELECT user_id, expires_at FROM auth_tokens WHERE token = ?'
+    );
+    $stmt->execute([$token]);
+    $row = $stmt->fetch();
+
+    if (!$row) {
+        return null;
+    }
+
+    // 检查是否过期
+    if (strtotime($row['expires_at']) < time()) {
+        // 删除过期 token
+        $stmt = $pdo->prepare('DELETE FROM auth_tokens WHERE token = ?');
+        $stmt->execute([$token]);
+        return null;
+    }
+
+    // 延期：更新 last_used_at，并将过期时间重置为 30 天后
+    $stmt = $pdo->prepare(
+        'UPDATE auth_tokens SET last_used_at = NOW(), expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY) WHERE token = ?'
+    );
+    $stmt->execute([$token]);
+
+    return (int)$row['user_id'];
+}
+
+/**
+ * 生成随机 Token
+ */
+function generateToken(): string {
+    return bin2hex(random_bytes(32)); // 64 字符
+}
+
+/**
+ * 为指定用户创建 Token 并返回
+ */
+function createTokenForUser(int $userId): string {
+    $token = generateToken();
+    $pdo = getDB();
+    $stmt = $pdo->prepare(
+        'INSERT INTO auth_tokens (user_id, token, expires_at, created_at, last_used_at)
+         VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 30 DAY), NOW(), NOW())'
+    );
+    $stmt->execute([$userId, $token]);
+    return $token;
 }
 
 /**

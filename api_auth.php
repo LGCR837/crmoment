@@ -37,13 +37,14 @@ function handleAuthRegister(): void {
     $stmt->execute([$username, $hash]);
     $userId = (int)$pdo->lastInsertId();
 
-    // 写入 Session
-    $_SESSION['user_id'] = $userId;
+    // 生成 Token
+    $token = createTokenForUser($userId);
 
     success([
         'id'       => $userId,
         'username' => $username,
         'avatar'   => null,
+        'token'    => $token,
     ], '注册成功');
 }
 
@@ -70,14 +71,15 @@ function handleAuthLogin(): void {
         error('用户名或密码错误');
     }
 
-    // 写入 Session
-    $_SESSION['user_id'] = (int)$user['id'];
+    // 生成 Token
+    $token = createTokenForUser((int)$user['id']);
 
     success([
         'id'       => (int)$user['id'],
         'username' => $user['username'],
         'avatar'   => $user['avatar'],
         'bio'      => $user['bio'],
+        'token'    => $token,
     ], '登录成功');
 }
 
@@ -87,10 +89,11 @@ function handleAuthLogin(): void {
 function handleAuthLogout(): void {
     assertMethod('POST');
     requireLogin();
-    $_SESSION = [];
-    if (ini_get('session.use_cookies')) {
-        setcookie(session_name(), '', time() - 42000, '/');
+    $token = getTokenFromRequest();
+    if ($token) {
+        $pdo = getDB();
+        $stmt = $pdo->prepare('DELETE FROM auth_tokens WHERE token = ?');
+        $stmt->execute([$token]);
     }
-    session_destroy();
     success(null, '已退出');
 }

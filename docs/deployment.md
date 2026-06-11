@@ -136,11 +136,21 @@ define('SITE_URL', 'https://你的域名');
 
 ## 认证机制
 
-使用 PHP Session。登录成功后，后端自动设置 `$_SESSION['user_id']`，后续请求通过 Cookie 自动携带 session ID。
+使用 Token 认证。登录/注册成功后，后端生成一个 64 字符的随机 Token 并返回给前端，前端存储在 `localStorage` 中。每次请求通过 `Authorization: Bearer <token>` 头部携带。
+
+### Token 特性
+
+- 每个账号可以同时拥有多个有效 Token（跨设备/跨浏览器登录）
+- Token 有效期：30 天
+- 每次请求会自动延期 Token（重置过期时间为 30 天后）
+- 退出登录时，该 Token 从服务端删除
+- Token 使用 `bin2hex(random_bytes(32))` 生成，不可猜测
+
+### 接口说明
 
 - 需要登录的接口 → 调用 `requireLogin()`，未登录返回 401
-- 免登录接口 → 所有游客可访问
-- 注销 → 销毁 session
+- 免登录接口 → 所有游客可访问（如浏览动态列表）
+- 动态的"是否已点赞"状态通过 `getCurrentUserId()` 获取当前用户（可能为 null）
 
 ## 通知触发规则
 

@@ -54,6 +54,19 @@ CREATE TABLE IF NOT EXISTS `likes` (
     FOREIGN KEY (`post_id`) REFERENCES `posts`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Token 认证表
+CREATE TABLE IF NOT EXISTS `auth_tokens` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `user_id` INT UNSIGNED NOT NULL,
+    `token` VARCHAR(64) NOT NULL UNIQUE,
+    `expires_at` DATETIME NOT NULL,
+    `last_used_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_token` (`token`),
+    INDEX `idx_user_id` (`user_id`),
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 通知表
 CREATE TABLE IF NOT EXISTS `notifications` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

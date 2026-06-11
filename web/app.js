@@ -111,6 +111,12 @@ async function api(method, path, body = null) {
         credentials: 'same-origin',
     };
 
+    // 附加 Token（从 localStorage 读取）
+    const token = localStorage.getItem('crmoment-token');
+    if (token) {
+        opts.headers['Authorization'] = 'Bearer ' + token;
+    }
+
     if (body instanceof FormData) {
         opts.body = body;
     } else if (body !== null) {
@@ -234,6 +240,11 @@ dom.authSubmit.addEventListener('click', async () => {
         const endpoint = authMode === 'login' ? '/auth/login' : '/auth/register';
         const result = await api('POST', endpoint, { username, password });
 
+        // 保存 Token 到 localStorage
+        if (result.token) {
+            localStorage.setItem('crmoment-token', result.token);
+        }
+
         state.user = result;
         updateAuthUI();
         dialogClose(dom.authDialog);
@@ -283,6 +294,8 @@ async function handleLogout() {
     try {
         await api('POST', '/auth/logout');
     } catch (_) {}
+    // 清除 Token
+    localStorage.removeItem('crmoment-token');
     state.user = null;
     updateAuthUI();
     showToast('已退出');
