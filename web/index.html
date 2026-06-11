@@ -59,6 +59,11 @@
             <md-icon slot="icon">home</md-icon>
             主页
         </md-text-button>
+        <md-text-button class="nav-btn" data-page="messages" id="nav-messages" style="display:none">
+            <md-icon slot="icon">chat</md-icon>
+            信息
+            <md-badge id="msg-badge" style="display:none"></md-badge>
+        </md-text-button>
         <md-text-button class="nav-btn" data-page="profile" id="nav-profile" style="display:none">
             <md-icon slot="icon">person</md-icon>
             我的
@@ -198,6 +203,29 @@
                 查看图片
             </md-text-button>
             <md-text-button id="image-viewer-close">关闭</md-text-button>
+        </div>
+    </md-dialog>
+
+    <!-- 创建群聊对话框 -->
+    <md-dialog id="create-group-dialog">
+        <div slot="headline">创建群聊</div>
+        <form slot="content" id="create-group-form" method="dialog">
+            <md-outlined-text-field
+                id="group-name-input"
+                label="群聊名称"
+                type="text"
+                required
+                minlength="1"
+                maxlength="50"
+                class="auth-field"
+            ></md-outlined-text-field>
+            <div class="section-title" style="margin-top:12px;">选择成员</div>
+            <div id="group-member-list" class="group-member-list"></div>
+            <div id="group-member-error" class="error-message" style="display:none"></div>
+        </form>
+        <div slot="actions">
+            <md-text-button id="create-group-cancel">取消</md-text-button>
+            <md-filled-button id="create-group-submit">创建</md-filled-button>
         </div>
     </md-dialog>
 

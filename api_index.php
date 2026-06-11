@@ -14,6 +14,7 @@ require_once __DIR__ . '/api_posts.php';
 require_once __DIR__ . '/api_comments.php';
 require_once __DIR__ . '/api_notifications.php';
 require_once __DIR__ . '/api_upload.php';
+require_once __DIR__ . '/api_conversations.php';
 
 // 解析请求路径
 $method = $_SERVER['REQUEST_METHOD'];
@@ -94,6 +95,24 @@ try {
         handleNotificationsUnread();
     } elseif ($path === '/notifications/read' && $method === 'PUT') {
         handleNotificationsRead();
+
+    // ---- Conversations ----
+    } elseif ($path === '/conversations' && $method === 'GET') {
+        handleConversationsList();
+    } elseif ($path === '/conversations' && $method === 'POST') {
+        handleConversationsCreate();
+    } elseif ($path === '/conversations/unread' && $method === 'GET') {
+        handleConversationsUnread();
+    } elseif (preg_match('#^/conversations/(\d+)/messages$#', $path, $m) && $method === 'GET') {
+        handleConversationMessages((int)$m[1]);
+    } elseif (preg_match('#^/conversations/(\d+)/messages$#', $path, $m) && $method === 'POST') {
+        handleConversationSend((int)$m[1]);
+    } elseif (preg_match('#^/conversations/(\d+)/read$#', $path, $m) && $method === 'POST') {
+        handleConversationRead((int)$m[1]);
+    } elseif (preg_match('#^/conversations/(\d+)/members$#', $path, $m) && $method === 'GET') {
+        handleConversationMembers((int)$m[1]);
+    } elseif (preg_match('#^/conversations/(\d+)/members$#', $path, $m) && $method === 'POST') {
+        handleConversationAddMember((int)$m[1]);
 
     // ---- Upload ----
     } elseif ($path === '/upload/image' && $method === 'POST') {

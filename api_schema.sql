@@ -72,6 +72,42 @@ CREATE TABLE IF NOT EXISTS `auth_tokens` (
     FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 会话表（私聊/群聊）
+CREATE TABLE IF NOT EXISTS `conversations` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `type` ENUM('private', 'group') NOT NULL DEFAULT 'private',
+    `name` VARCHAR(100) DEFAULT NULL COMMENT '群聊名称',
+    `avatar` VARCHAR(255) DEFAULT NULL,
+    `created_by` INT UNSIGNED NOT NULL,
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_updated_at` (`updated_at`),
+    FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 会话参与者表
+CREATE TABLE IF NOT EXISTS `conversation_members` (
+    `conversation_id` INT UNSIGNED NOT NULL,
+    `user_id` INT UNSIGNED NOT NULL,
+    `last_read_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `joined_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`conversation_id`, `user_id`),
+    FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 消息表
+CREATE TABLE IF NOT EXISTS `messages` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `conversation_id` INT UNSIGNED NOT NULL,
+    `user_id` INT UNSIGNED NOT NULL,
+    `content` TEXT NOT NULL,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_conv_id` (`conversation_id`, `id`),
+    FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 通知表
 CREATE TABLE IF NOT EXISTS `notifications` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

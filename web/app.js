@@ -47,10 +47,14 @@ const state = {
     page: 1,                  // 当前页码
     hasMore: true,
     loading: false,
-    currentPage: 'home',      // home / profile / explore / user
+    currentPage: 'home',      // home / messages / profile / explore / user / chat
     viewUserId: null,         // 正在查看的用户 ID（当 currentPage === 'user'）
     commentPostId: null,      // 正在查看评论的动态 ID
     selectedImages: [],       // 待上传图片
+    conversations: [],        // 会话列表
+    currentConvId: null,      // 当前打开的会话 ID
+    conversationMessages: {}, // { convId: [messages...] }
+    pollingTimers: {},        // { convId: timerHandle }
 };
 
 // ===== DOM 引用 =====
@@ -102,6 +106,14 @@ const dom = {
     imageViewerClose: $('#image-viewer-close'),
     imageViewerCopy: $('#image-viewer-copy'),
     imageViewerOpen: $('#image-viewer-open'),
+    createGroupDialog: $('#create-group-dialog'),
+    groupNameInput: $('#group-name-input'),
+    groupMemberList: $('#group-member-list'),
+    groupMemberError: $('#group-member-error'),
+    createGroupSubmit: $('#create-group-submit'),
+    createGroupCancel: $('#create-group-cancel'),
+    msgBadge: $('#msg-badge'),
+    navMessages: $('#nav-messages'),
 };
 
 // ===== API 请求 =====
@@ -291,6 +303,7 @@ function updateAuthUI() {
         dom.navAuth.style.display = 'none';
         dom.navUser.style.display = 'flex';
         dom.navProfile.style.display = '';
+        dom.navMessages.style.display = '';
         dom.userAvatarImg.src = state.user.avatar || '/uploads/avatars/default.svg';
         dom.userAvatarImg.onerror = function() {
             const name = state.user.nickname || state.user.username;
@@ -305,6 +318,7 @@ function updateAuthUI() {
         dom.navAuth.style.display = 'flex';
         dom.navUser.style.display = 'none';
         dom.navProfile.style.display = 'none';
+        dom.navMessages.style.display = 'none';
     }
 }
 
@@ -319,6 +333,8 @@ async function handleLogout() {
     try {
         await api('POST', '/auth/logout');
     } catch (_) {}
+    // 停止聊天轮询
+    stopAllPolling();
     // 清除 Token
     localStorage.removeItem('crmoment-token');
     state.user = null;
@@ -349,10 +365,19 @@ function navigateTo(page) {
     const activeBtn = document.querySelector(`.nav-btn[data-page="${page}"]`);
     if (activeBtn) activeBtn.classList.add('active');
 
+    // 离开聊天详情时停止轮询
+    if (page !== 'chat') {
+        stopAllPolling();
+    }
+
     switch (page) {
         case 'home': renderHome(); break;
+        case 'messages': renderConversationList(); break;
         case 'profile': renderProfile(); break;
         case 'explore': renderExplore(); break;
+        case 'chat':
+            if (state.currentConvId) renderConversationDetail(state.currentConvId);
+            break;
     }
 }
 
@@ -1114,6 +1139,14 @@ async function renderUserProfile(userId) {
                 <div class="profile-stats">
                     <div class="stat"><div class="stat-num">${user.posts_count || 0}</div><div class="stat-label">动态</div></div>
                 </div>
+                ${!isSelf ? `
+                <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
+                    <md-filled-tonal-button id="btn-start-chat" data-user-id="${userId}">
+                        <md-icon slot="icon">chat</md-icon>
+                        发私信
+                    </md-filled-tonal-button>
+                </div>
+                ` : ''}
             </div>
             <div class="section-title">${escapeHtml(user.nickname || user.username)} 的动态</div>
             <div id="user-posts"></div>
@@ -1125,6 +1158,18 @@ async function renderUserProfile(userId) {
             const homeBtn = document.querySelector('.nav-btn[data-page="home"]');
             if (homeBtn) homeBtn.classList.add('active');
             renderHome();
+        });
+
+        $('#btn-start-chat')?.addEventListener('click', async () => {
+            const otherUserId = parseInt($('#btn-start-chat').dataset.userId);
+            if (!otherUserId) return;
+            try {
+                const result = await api('POST', '/conversations', { type: 'private', user_id: otherUserId });
+                state.currentConvId = result.id;
+                navigateTo('chat');
+            } catch (e) {
+                showToast(e.message);
+            }
         });
 
         const userPosts = postsData.list.filter(p => p.user_id === userId);
@@ -1210,6 +1255,781 @@ function renderExplore() {
     });
 }
 
+// ===== 聊天子系统 =====
+
+/**
+ * 页面 A - 会话列表
+ */
+async function renderConversationList() {
+    dom.main.innerHTML = '<div class="loading-indicator"><md-circular-progress indeterminate></md-circular-progress></div>';
+
+    await loadConversations();
+
+    dom.main.innerHTML = `
+        <div class="conv-list-header">
+            <div class="section-title" style="margin:0;">信息</div>
+            <md-filled-tonal-button id="btn-create-group" style="--md-filled-tonal-button-container-shape:24px;">
+                <md-icon slot="icon">group_add</md-icon>
+                创建群聊
+            </md-filled-tonal-button>
+        </div>
+        <div id="conv-list"></div>
+    `;
+
+    $('#btn-create-group')?.addEventListener('click', () => {
+        openCreateGroupDialog();
+    });
+
+    if (state.conversations.length === 0) {
+        $('#conv-list').innerHTML = '<div class="end-indicator">暂无会话</div>';
+        return;
+    }
+
+    const listHtml = state.conversations.map(conv => renderConvItem(conv)).join('\n');
+    $('#conv-list').innerHTML = listHtml;
+
+    state.conversations.forEach(conv => {
+        const el = document.getElementById(`conv-item-${conv.id}`);
+        if (el) {
+            el.addEventListener('click', () => {
+                state.currentConvId = conv.id;
+                navigateTo('chat');
+            });
+        }
+    });
+}
+
+function renderConvItem(conv) {
+    const lastMsg = conv.last_msg_id ? conv.last_msg_content : '';
+    const lastMsgPreview = conv.last_msg_id
+        ? (conv.last_msg_user_id && parseInt(conv.last_msg_user_id) !== (state.user?.id)
+            ? `${conv.last_msg_nickname || conv.last_msg_username}: ${lastMsg}`
+            : lastMsg)
+        : '暂无消息';
+
+    const timeStr = conv.updated_at ? formatTimeShort(conv.updated_at) : '';
+    const unread = conv.unread_count > 0;
+
+    if (conv.type === 'group') {
+        return `
+        <div class="conv-item" id="conv-item-${conv.id}">
+            <div class="conv-avatar-wrap">
+                <div class="conv-avatar conv-avatar-group">
+                    <md-icon>group</md-icon>
+                </div>
+            </div>
+            <div class="conv-info">
+                <div class="conv-name-row">
+                    <span class="conv-name">${escapeHtml(conv.display_name || conv.name || '群聊')}</span>
+                    <span class="conv-time">${escapeHtml(timeStr)}</span>
+                </div>
+                <div class="conv-preview">
+                    <span class="conv-preview-text">${escapeHtml(lastMsgPreview.slice(0, 50))}</span>
+                    ${unread ? '<span class="conv-unread-dot"></span>' : ''}
+                </div>
+            </div>
+        </div>`;
+    }
+
+    return `
+    <div class="conv-item" id="conv-item-${conv.id}">
+        <div class="conv-avatar-wrap">
+            <img src="${conv.display_avatar || '/uploads/avatars/default.svg'}" 
+                 class="conv-avatar"
+                 onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="24" fill="#e0e0e0"/><text x="24" y="30" text-anchor="middle" font-size="18" fill="#999">' + (conv.display_name || '?')[0] + '</text></svg>')}'">
+        </div>
+        <div class="conv-info">
+            <div class="conv-name-row">
+                <span class="conv-name">${escapeHtml(conv.display_name || '用户')}</span>
+                <span class="conv-time">${escapeHtml(timeStr)}</span>
+            </div>
+            <div class="conv-preview">
+                <span class="conv-preview-text">${escapeHtml(lastMsgPreview.slice(0, 50))}</span>
+                ${unread ? '<span class="conv-unread-dot"></span>' : ''}
+            </div>
+        </div>
+    </div>`;
+}
+
+async function loadConversations() {
+    try {
+        const data = await api('GET', '/conversations');
+        state.conversations = data.list || [];
+    } catch (e) {
+        console.error('加载会话失败:', e);
+        state.conversations = [];
+    }
+}
+
+/**
+ * 页面 B - 聊天详情
+ */
+async function renderConversationDetail(convId) {
+    const conv = state.conversations.find(c => c.id === convId);
+
+    // 如果会话不在本地列表中（例如从私聊按钮直接创建后跳转），尝试从 API 加载
+    if (!conv) {
+        try {
+            await loadConversations();
+            // 重新查找
+            const found = state.conversations.find(c => c.id === convId);
+            if (found) {
+                return renderConversationDetail(convId); // 递归，这次能找到了
+            }
+        } catch (_) {}
+        // 仍然没找到，用 convId 继续渲染，显示默认名称
+    }
+
+    const displayName = conv
+        ? (conv.display_name || (conv.other_user?.nickname || conv.other_user?.username || '聊天'))
+        : '聊天';
+    const messages = state.conversationMessages[convId] || [];
+    state.currentConvType = conv?.type || 'private';
+
+    dom.main.innerHTML = `
+        <div class="chat-detail">
+            <div class="chat-detail-header">
+                <md-icon-button id="btn-back-to-conv">
+                    <md-icon>arrow_back</md-icon>
+                </md-icon-button>
+                <span class="chat-detail-title">${escapeHtml(displayName)}</span>
+            </div>
+            <div class="chat-messages" id="chat-messages">
+                ${messages.length === 0 ? '<div class="end-indicator">暂无消息，发送第一条消息吧</div>' : ''}
+                ${messages.map(m => renderChatMessage(m)).join('\n')}
+            </div>
+            <div class="chat-input-bar">
+                <md-icon-button id="btn-chat-image" title="发送图片">
+                    <md-icon>add_photo_alternate</md-icon>
+                </md-icon-button>
+                <input type="file" id="chat-image-input" accept="image/*" style="display:none">
+                ${state.currentConvType === 'group' ? `
+                <md-icon-button id="btn-chat-invite" title="邀请成员">
+                    <md-icon>person_add</md-icon>
+                </md-icon-button>` : ''}
+                <textarea id="chat-input" placeholder="输入消息..." rows="1" maxlength="5000"></textarea>
+                <md-filled-button id="btn-chat-send">
+                    <md-icon slot="icon">send</md-icon>
+                    发送
+                </md-filled-button>
+            </div>
+        </div>
+    `;
+
+    // 返回按钮
+    $('#btn-back-to-conv')?.addEventListener('click', () => {
+        stopPolling(convId);
+        navigateTo('messages');
+    });
+
+    // 发送消息
+    const chatInput = $('#chat-input');
+    const chatSend = $('#btn-chat-send');
+
+    async function doSend() {
+        const content = chatInput.value.trim();
+        if (!content) return;
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+        try {
+            // 乐观更新
+            const tempMsg = {
+                id: Date.now(),
+                user_id: state.user.id,
+                content: content,
+                created_at: new Date().toISOString().replace('T', ' ').slice(0, 19),
+                nickname: state.user.nickname,
+                username: state.user.username,
+                avatar: state.user.avatar,
+                _pending: true,
+            };
+            if (!state.conversationMessages[convId]) {
+                state.conversationMessages[convId] = [];
+            }
+            state.conversationMessages[convId].push(tempMsg);
+            appendChatMessage(tempMsg);
+            scrollChatToBottom();
+
+            const result = await api('POST', `/conversations/${convId}/messages`, { content });
+            // 替换临时消息
+            const msgs = state.conversationMessages[convId];
+            const idx = msgs.findIndex(m => m._pending && m.id === tempMsg.id);
+            if (idx !== -1) {
+                msgs[idx] = result;
+            }
+            const msgEl = document.getElementById(`msg-${tempMsg.id}`);
+            if (msgEl) {
+                msgEl.outerHTML = renderChatMessage(result);
+            }
+        } catch (e) {
+            showToast('发送失败: ' + e.message);
+        }
+    }
+
+    chatSend?.addEventListener('click', doSend);
+    chatInput?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            doSend();
+        }
+    });
+
+    // 自动调整输入框高度
+    chatInput?.addEventListener('input', () => {
+        chatInput.style.height = 'auto';
+        chatInput.style.height = Math.min(chatInput.scrollHeight, 100) + 'px';
+    });
+
+    // 图片按钮 - 选择图片
+    const chatImageBtn = $('#btn-chat-image');
+    const chatImageInput = $('#chat-image-input');
+    chatImageBtn?.addEventListener('click', () => {
+        chatImageInput.click();
+    });
+    chatImageInput?.addEventListener('change', async () => {
+        const file = chatImageInput.files?.[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('image', file);
+
+        try {
+            // 上传图片获取 URL
+            const uploadResult = await api('POST', '/upload/image', formData);
+            const imageUrl = uploadResult.url;
+
+            // 作为图片消息发送
+            const content = imageUrl;
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
+
+            const tempMsg = {
+                id: Date.now(),
+                user_id: state.user.id,
+                content: content,
+                created_at: new Date().toISOString().replace('T', ' ').slice(0, 19),
+                nickname: state.user.nickname,
+                username: state.user.username,
+                avatar: state.user.avatar,
+                _pending: true,
+            };
+            if (!state.conversationMessages[convId]) {
+                state.conversationMessages[convId] = [];
+            }
+            state.conversationMessages[convId].push(tempMsg);
+            appendChatMessage(tempMsg);
+            scrollChatToBottom();
+
+            const result = await api('POST', `/conversations/${convId}/messages`, { content });
+            const msgs = state.conversationMessages[convId];
+            const idx = msgs.findIndex(m => m._pending && m.id === tempMsg.id);
+            if (idx !== -1) {
+                msgs[idx] = result;
+            }
+            const msgEl = document.getElementById(`msg-${tempMsg.id}`);
+            if (msgEl) {
+                msgEl.outerHTML = renderChatMessage(result);
+            }
+        } catch (e) {
+            showToast('图片发送失败: ' + e.message);
+        }
+
+        chatImageInput.value = '';
+    });
+
+    // 邀请按钮 - 拉人进群
+    $('#btn-chat-invite')?.addEventListener('click', async () => {
+        await showInviteDialog(convId);
+    });
+
+    // 点击消息中的用户头像 → 跳转个人主页
+    if (state.currentConvType === 'group') {
+        const msgContainer = $('#chat-messages');
+        msgContainer?.addEventListener('click', (e) => {
+            const avatar = e.target.closest('.chat-msg-avatar');
+            if (avatar) {
+                const userId = parseInt(avatar.dataset.userId);
+                if (userId && userId !== state.user?.id) {
+                    navigateToUserProfile(userId);
+                }
+            }
+        });
+    }
+
+    // 加载历史消息（第一次进入时加载全部）
+    if (!state.conversationMessages[convId] || state.conversationMessages[convId].length === 0) {
+        try {
+            const data = await api('GET', `/conversations/${convId}/messages?since_id=0`);
+            state.conversationMessages[convId] = data.messages || [];
+            const container = $('#chat-messages');
+            if (container) {
+                container.innerHTML = state.conversationMessages[convId].length === 0
+                    ? '<div class="end-indicator">暂无消息，发送第一条消息吧</div>'
+                    : state.conversationMessages[convId].map(m => renderChatMessage(m)).join('\n');
+            }
+            scrollChatToBottom();
+        } catch (e) {
+            console.error('加载消息失败:', e);
+        }
+    }
+
+    // 标记已读
+    try {
+        await api('POST', `/conversations/${convId}/read`);
+    } catch (_) {}
+
+    // 开始轮询
+    startPolling(convId);
+}
+
+function renderChatMessage(msg) {
+    const isSelf = parseInt(msg.user_id) === state.user?.id;
+    const isGroup = state.currentConvType === 'group';
+    const time = msg.created_at ? formatChatTime(msg.created_at) : '';
+    const pendingClass = msg._pending ? ' style="opacity:0.5;"' : '';
+
+    let contentHtml;
+    const content = msg.content || '';
+    // 检测是否为图片 URL
+    const isImage = /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(content)
+        && (content.startsWith('http://') || content.startsWith('https://') || content.startsWith('/'));
+    if (isImage) {
+        contentHtml = `<img src="${content}" alt="图片" class="chat-msg-image" style="cursor:pointer">`;
+    } else {
+        contentHtml = `<div>${escapeHtml(content)}</div>`;
+    }
+
+    if (isGroup) {
+        const avatarUrl = msg.avatar || '/uploads/avatars/default.svg';
+        const displayName = msg.nickname || msg.username || '用户';
+        if (isSelf) {
+            return `
+            <div class="chat-msg-row self group" id="msg-${msg.id}"${pendingClass}>
+                <div class="chat-msg-bubble">
+                    ${contentHtml}
+                    <div class="chat-msg-time">${escapeHtml(time)}</div>
+                </div>
+            </div>`;
+        } else {
+            return `
+            <div class="chat-msg-row other group" id="msg-${msg.id}"${pendingClass}>
+                <img src="${avatarUrl}" alt="" class="chat-msg-avatar" data-user-id="${msg.user_id}" style="cursor:pointer" onerror="this.src='/uploads/avatars/default.svg'">
+                <div>
+                    <div class="chat-msg-name">${escapeHtml(displayName)}</div>
+                    <div class="chat-msg-bubble">
+                        ${contentHtml}
+                        <div class="chat-msg-time">${escapeHtml(time)}</div>
+                    </div>
+                </div>
+            </div>`;
+        }
+    }
+
+    return `
+    <div class="chat-msg-row ${isSelf ? 'self' : 'other'}" id="msg-${msg.id}"${pendingClass}>
+        <div class="chat-msg-bubble">
+            ${contentHtml}
+            <div class="chat-msg-time">${escapeHtml(time)}</div>
+        </div>
+    </div>`;
+}
+
+function appendChatMessage(msg) {
+    const container = $('#chat-messages');
+    if (!container) return;
+    // 移除 "暂无消息" 提示
+    const empty = container.querySelector('.end-indicator');
+    if (empty) empty.remove();
+    container.insertAdjacentHTML('beforeend', renderChatMessage(msg));
+}
+
+function scrollChatToBottom() {
+    const container = $('#chat-messages');
+    if (container) {
+        container.scrollTop = container.scrollHeight;
+    }
+}
+
+/**
+ * 轮询新消息
+ */
+function startPolling(convId) {
+    stopPolling(convId); // 先停止旧的
+
+    const timer = setInterval(async () => {
+        const msgs = state.conversationMessages[convId] || [];
+        const lastId = msgs.length > 0 ? Math.max(...msgs.filter(m => !m._pending).map(m => m.id)) : 0;
+
+        try {
+            const data = await api('GET', `/conversations/${convId}/messages?since_id=${lastId}`);
+            const newMsgs = data.messages || [];
+            if (newMsgs.length === 0) return;
+
+            if (!state.conversationMessages[convId]) {
+                state.conversationMessages[convId] = [];
+            }
+
+            // 去重，避免重复追加
+            const existingIds = new Set(state.conversationMessages[convId].map(m => m.id));
+            const toAdd = newMsgs.filter(m => !existingIds.has(m.id));
+
+            if (toAdd.length === 0) return;
+
+            state.conversationMessages[convId].push(...toAdd);
+            toAdd.forEach(m => appendChatMessage(m));
+
+            // 如果正在查看该会话则标记已读
+            if (state.currentPage === 'chat' && state.currentConvId === convId) {
+                scrollChatToBottom();
+                try {
+                    await api('POST', `/conversations/${convId}/read`);
+                } catch (_) {}
+            }
+
+            // 同时刷新会话列表的未读数
+            updateConvUnreadBadge();
+        } catch (e) {
+            console.error('轮询消息失败:', e);
+        }
+    }, 3000);
+
+    state.pollingTimers[convId] = timer;
+}
+
+function stopPolling(convId) {
+    if (state.pollingTimers[convId]) {
+        clearInterval(state.pollingTimers[convId]);
+        delete state.pollingTimers[convId];
+    }
+}
+
+function stopAllPolling() {
+    Object.keys(state.pollingTimers).forEach(convId => stopPolling(parseInt(convId)));
+}
+
+/**
+ * 创建群聊对话框
+ */
+async function openCreateGroupDialog() {
+    if (!state.user) return;
+
+    // 加载用户列表 — 只显示和自己有私聊的用户
+    try {
+        // 确保会话列表已加载
+        if (!state.conversations || state.conversations.length === 0) {
+            await loadConversations();
+        }
+
+        // 从私聊中提取对方用户
+        const userMap = new Map();
+        for (const conv of state.conversations) {
+            if (conv.type === 'private' && conv.other_user && conv.other_user.id !== state.user.id) {
+                const u = conv.other_user;
+                if (!userMap.has(u.id)) {
+                    userMap.set(u.id, {
+                        id: u.id,
+                        nickname: u.nickname || u.username,
+                        username: u.username,
+                        avatar: u.avatar,
+                    });
+                }
+            }
+        }
+
+        const allUsers = Array.from(userMap.values());
+
+        dom.groupMemberList.innerHTML = allUsers.length === 0
+            ? '<div class="end-indicator">暂无私聊用户</div>'
+            : allUsers.map(u => `
+                <label class="group-member-item">
+                    <img src="${u.avatar || '/uploads/avatars/default.svg'}"
+                         onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#e0e0e0"/><text x="18" y="24" text-anchor="middle" font-size="16" fill="#999">' + (u.nickname || u.username)[0] + '</text></svg>')}'">
+                    <span class="member-name">${escapeHtml(u.nickname || u.username)}</span>
+                    <md-checkbox touch-target="wrapper" data-user-id="${u.id}"></md-checkbox>
+                </label>
+            `).join('');
+
+        dialogOpen(dom.createGroupDialog);
+    } catch (e) {
+        showToast('加载用户列表失败: ' + e.message);
+    }
+}
+
+// 创建群聊 - 提交
+dom.createGroupSubmit?.addEventListener('click', async () => {
+    const name = dom.groupNameInput.value.trim();
+    if (!name) {
+        dom.groupMemberError.textContent = '请输入群聊名称';
+        dom.groupMemberError.style.display = 'block';
+        return;
+    }
+
+    const allCheckboxes = dom.groupMemberList.querySelectorAll('md-checkbox');
+    const checkedBoxes = Array.from(allCheckboxes).filter(cb => cb.checked);
+    const userIds = checkedBoxes.map(cb => parseInt(cb.dataset.userId));
+
+    if (userIds.length === 0) {
+        dom.groupMemberError.textContent = '请至少选择一位成员';
+        dom.groupMemberError.style.display = 'block';
+        return;
+    }
+
+    dom.groupMemberError.style.display = 'none';
+
+    try {
+        const result = await api('POST', '/conversations', {
+            type: 'group',
+            name,
+            user_ids: userIds,
+        });
+        dialogClose(dom.createGroupDialog);
+        dom.groupNameInput.value = '';
+        showToast('群聊创建成功');
+        state.currentConvId = result.id;
+        navigateTo('chat');
+    } catch (e) {
+        dom.groupMemberError.textContent = e.message;
+        dom.groupMemberError.style.display = 'block';
+    }
+});
+
+dom.createGroupCancel?.addEventListener('click', () => {
+    dialogClose(dom.createGroupDialog);
+    dom.groupNameInput.value = '';
+    dom.groupMemberError.style.display = 'none';
+});
+
+/**
+ * 显示群信息对话框（成员列表）
+ */
+async function showGroupInfoDialog(convId) {
+    if (!state.user) return;
+
+    try {
+        const data = await api('GET', `/conversations/${convId}/members`);
+        const members = data.members || [];
+
+        // 创建对话框
+        const dialog = document.createElement('md-dialog');
+        dialog.id = 'group-info-dialog';
+
+        const memberHtml = members.map(m => `
+            <div class="group-member-item" style="cursor:pointer" data-user-id="${m.id}">
+                <img src="${m.avatar || '/uploads/avatars/default.svg'}"
+                     onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#e0e0e0"/><text x="18" y="24" text-anchor="middle" font-size="16" fill="#999">' + (m.nickname || m.username)[0] + '</text></svg>')}'">
+                <span class="member-name">${escapeHtml(m.nickname || m.username)}</span>
+            </div>
+        `).join('');
+
+        dialog.innerHTML = `
+            <div slot="headline">群成员 (${members.length}人)</div>
+            <div slot="content" style="min-width:280px;">
+                ${memberHtml || '<div class="end-indicator">暂无成员</div>'}
+            </div>
+            <div slot="actions">
+                <md-text-button id="group-info-close">关闭</md-text-button>
+            </div>
+        `;
+
+        document.body.appendChild(dialog);
+
+        // 成员点击 - 进入个人主页
+        dialog.addEventListener('click', (e) => {
+            const item = e.target.closest('.group-member-item');
+            if (item) {
+                const userId = parseInt(item.dataset.userId);
+                if (userId && userId !== state.user?.id) {
+                    dialogClose(dialog);
+                    dialog.remove();
+                    navigateToUserProfile(userId);
+                }
+            }
+        });
+
+        dialog.querySelector('#group-info-close')?.addEventListener('click', () => {
+            dialogClose(dialog);
+            dialog.remove();
+        });
+
+        dialog.addEventListener('close', () => {
+            dialog.remove();
+        });
+
+        dialogOpen(dialog);
+    } catch (e) {
+        showToast('加载群信息失败: ' + e.message);
+    }
+}
+
+/**
+ * 显示邀请成员对话框（拉人进群）
+ */
+async function showInviteDialog(convId) {
+    if (!state.user) return;
+
+    try {
+        // 先获取现有成员
+        const memberData = await api('GET', `/conversations/${convId}/members`);
+        const existingIds = new Set((memberData.members || []).map(m => m.id));
+
+        // 获取可选用户列表 — 从私聊中提取
+        if (!state.conversations || state.conversations.length === 0) {
+            await loadConversations();
+        }
+
+        const userMap = new Map();
+        for (const conv of state.conversations) {
+            if (conv.type === 'private' && conv.other_user && conv.other_user.id !== state.user.id) {
+                const u = conv.other_user;
+                if (!userMap.has(u.id)) {
+                    userMap.set(u.id, {
+                        id: u.id,
+                        nickname: u.nickname || u.username,
+                        username: u.username,
+                        avatar: u.avatar,
+                    });
+                }
+            }
+        }
+
+        // 过滤掉已在群中的用户
+        const allUsers = Array.from(userMap.values()).filter(u => !existingIds.has(u.id));
+
+        // 创建对话框
+        const dialog = document.createElement('md-dialog');
+        dialog.id = 'invite-dialog';
+
+        dialog.innerHTML = `
+            <div slot="headline">邀请成员</div>
+            <div slot="content" style="min-width:300px;">
+                <div id="invite-member-list" class="group-member-list">
+                    ${allUsers.length === 0
+                        ? '<div class="end-indicator">没有可邀请的用户</div>'
+                        : allUsers.map(u => `
+                            <label class="group-member-item">
+                                <img src="${u.avatar || '/uploads/avatars/default.svg'}"
+                                     onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#e0e0e0"/><text x="18" y="24" text-anchor="middle" font-size="16" fill="#999">' + (u.nickname || u.username)[0] + '</text></svg>')}'">
+                                <span class="member-name">${escapeHtml(u.nickname || u.username)}</span>
+                                <md-checkbox touch-target="wrapper" data-user-id="${u.id}"></md-checkbox>
+                            </label>
+                        `).join('')}
+                </div>
+                <div id="invite-error" class="error-message" style="display:none"></div>
+            </div>
+            <div slot="actions">
+                <md-text-button id="invite-cancel">取消</md-text-button>
+                <md-filled-button id="invite-submit">邀请</md-filled-button>
+            </div>
+        `;
+
+        document.body.appendChild(dialog);
+
+        dialog.querySelector('#invite-cancel')?.addEventListener('click', () => {
+            dialogClose(dialog);
+            dialog.remove();
+        });
+
+        dialog.querySelector('#invite-submit')?.addEventListener('click', async () => {
+            const allCheckboxes = dialog.querySelectorAll('#invite-member-list md-checkbox');
+            const checkedBoxes = Array.from(allCheckboxes).filter(cb => cb.checked);
+            const userIds = checkedBoxes.map(cb => parseInt(cb.dataset.userId));
+
+            if (userIds.length === 0) {
+                dialog.querySelector('#invite-error').textContent = '请至少选择一位用户';
+                dialog.querySelector('#invite-error').style.display = 'block';
+                return;
+            }
+
+            dialog.querySelector('#invite-error').style.display = 'none';
+
+            try {
+                await api('POST', `/conversations/${convId}/members`, { user_ids: userIds });
+                dialogClose(dialog);
+                dialog.remove();
+                showToast('邀请成功');
+                // 刷新会话列表（更新成员信息）
+                await loadConversations();
+            } catch (e) {
+                dialog.querySelector('#invite-error').textContent = e.message;
+                dialog.querySelector('#invite-error').style.display = 'block';
+            }
+        });
+
+        dialog.addEventListener('close', () => {
+            dialog.remove();
+        });
+
+        dialogOpen(dialog);
+    } catch (e) {
+        showToast('加载用户列表失败: ' + e.message);
+    }
+}
+
+/**
+ * 检查未读会话并更新 badge
+ */
+async function checkUnreadConversations() {
+    if (!state.user) return;
+    try {
+        const data = await api('GET', '/conversations/unread');
+        const count = data.unread_count || 0;
+        const badge = dom.msgBadge;
+        if (count > 0) {
+            badge.textContent = count > 99 ? '99+' : count;
+            badge.style.display = '';
+        } else {
+            badge.style.display = 'none';
+        }
+    } catch (_) {}
+}
+
+function updateConvUnreadBadge() {
+    const totalUnread = state.conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0);
+    const badge = dom.msgBadge;
+    if (totalUnread > 0) {
+        badge.textContent = totalUnread > 99 ? '99+' : totalUnread;
+        badge.style.display = '';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+/**
+ * 格式化为简短时间（用于会话列表）
+ */
+function formatTimeShort(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr.replace(' ', 'T') + 'Z');
+    const now = new Date();
+    const diff = (now - d) / 1000;
+
+    if (diff < 60) return '刚刚';
+    if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
+    if (diff < 86400) {
+        const h = d.getHours().toString().padStart(2, '0');
+        const m = d.getMinutes().toString().padStart(2, '0');
+        return `${h}:${m}`;
+    }
+    if (diff < 172800) return '昨天';
+    if (diff < 2592000) return `${Math.floor(diff / 86400)}天前`;
+
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${mo}-${day}`;
+}
+
+/**
+ * 格式化为聊天时间（用于消息气泡）
+ */
+function formatChatTime(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr.replace(' ', 'T') + 'Z');
+    const h = d.getHours().toString().padStart(2, '0');
+    const m = d.getMinutes().toString().padStart(2, '0');
+    return `${h}:${m}`;
+}
+
 // ===== 工具函数 =====
 function formatTime(dateStr) {
     if (!dateStr) return '';
@@ -1259,6 +2079,9 @@ async function init() {
     if (state.user) {
         await checkUnread();
         setInterval(checkUnread, 30000);
+        // 检查未读会话
+        await checkUnreadConversations();
+        setInterval(checkUnreadConversations, 30000);
     }
 
     // ===== 深色/浅色模式切换（支持设备系统自动适配） =====
