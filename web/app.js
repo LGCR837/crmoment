@@ -108,20 +108,30 @@ async function api(method, path, body = null) {
     const opts = {
         method,
         headers: {},
-        credentials: 'same-origin',
     };
 
-    // 附加 Token（从 localStorage 读取）
+    // 从 localStorage 读取 Token
     const token = localStorage.getItem('crmoment-token');
-    if (token) {
-        opts.headers['Authorization'] = 'Bearer ' + token;
-    }
 
     if (body instanceof FormData) {
+        // FormData 方式：把 token 作为字段追加进去
+        if (token) {
+            body.append('token', token);
+        }
         opts.body = body;
     } else if (body !== null) {
+        // JSON 方式：把 token 合并到 body 中
+        if (token) {
+            body.token = token;
+        }
         opts.headers['Content-Type'] = 'application/json';
         opts.body = JSON.stringify(body);
+    } else {
+        // GET/DELETE 等无 body 的请求：把 token 拼到 URL 查询参数上
+        if (token) {
+            const sep = path.indexOf('?') === -1 ? '?' : '&';
+            path = path + sep + 'token=' + encodeURIComponent(token);
+        }
     }
 
     // 将 path 中的查询参数（?key=val）拆出来，附加到 API_BASE 末尾作为独立参数

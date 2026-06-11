@@ -62,15 +62,23 @@ function getCurrentUserId(): ?int {
 
 /**
  * 从请求中获取 Token
- * 优先从 Authorization: Bearer xxx 头部获取
+ * 优先从 GET/POST 参数获取，兼容 JSON body 中的 token 字段
  */
 function getTokenFromRequest(): ?string {
-    $header = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['Authorization'] ?? '';
-    if (preg_match('/^Bearer\s+(.+)$/i', $header, $m)) {
-        return $m[1];
+    // 从 GET 或 POST 参数获取
+    $token = $_GET['token'] ?? $_POST['token'] ?? null;
+    if ($token) {
+        return $token;
     }
-    // 也支持 GET/POST 参数方式（用于某些特殊场景）
-    return $_GET['token'] ?? $_POST['token'] ?? null;
+    // 也支持 JSON body 中的 token 字段（POST/PUT 时 body.token 会被解析后以参数形式传入）
+    $raw = file_get_contents('php://input');
+    if ($raw) {
+        $data = json_decode($raw, true);
+        if (is_array($data) && !empty($data['token'])) {
+            return $data['token'];
+        }
+    }
+    return null;
 }
 
 /**
