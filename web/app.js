@@ -63,6 +63,7 @@ const dom = {
     authTitle: $('#auth-title'),
     authForm: $('#auth-form'),
     authUsername: $('#auth-username'),
+    authNickname: $('#auth-nickname'),
     authPassword: $('#auth-password'),
     authPasswordConfirm: $('#auth-password-confirm'),
     authError: $('#auth-error'),
@@ -222,6 +223,8 @@ function switchAuthMode(mode) {
     dom.authError.style.display = 'none';
     dom.authPassword.value = '';
     dom.authPasswordConfirm.value = '';
+    dom.authNickname.style.display = mode === 'register' ? '' : 'none';
+    dom.authNickname.required = mode === 'register';
     dom.authPasswordConfirm.style.display = mode === 'register' ? '' : 'none';
     dom.authPasswordConfirm.required = mode === 'register';
 }
@@ -233,6 +236,7 @@ dom.authSubmit.addEventListener('click', async () => {
     const username = dom.authUsername.value.trim();
     const password = dom.authPassword.value;
     const confirmPassword = dom.authPasswordConfirm.value;
+    const nickname = dom.authNickname.value.trim();
 
     if (!username || !password) {
         dom.authError.textContent = '请填写用户名和密码';
@@ -240,15 +244,25 @@ dom.authSubmit.addEventListener('click', async () => {
         return;
     }
 
-    if (authMode === 'register' && password !== confirmPassword) {
-        dom.authError.textContent = '两次密码输入不一致';
-        dom.authError.style.display = 'block';
-        return;
+    if (authMode === 'register') {
+        if (password !== confirmPassword) {
+            dom.authError.textContent = '两次密码输入不一致';
+            dom.authError.style.display = 'block';
+            return;
+        }
+        if (!nickname) {
+            dom.authError.textContent = '请填写昵称';
+            dom.authError.style.display = 'block';
+            return;
+        }
     }
 
     try {
         const endpoint = authMode === 'login' ? '/auth/login' : '/auth/register';
-        const result = await api('POST', endpoint, { username, password });
+        const body = authMode === 'login'
+            ? { username, password }
+            : { username, nickname, password };
+        const result = await api('POST', endpoint, body);
 
         // 保存 Token 到 localStorage
         if (result.token) {
@@ -279,10 +293,11 @@ function updateAuthUI() {
         dom.navProfile.style.display = '';
         dom.userAvatarImg.src = state.user.avatar || '/uploads/avatars/default.svg';
         dom.userAvatarImg.onerror = function() {
+            const name = state.user.nickname || state.user.username;
             this.src = 'data:image/svg+xml,' + encodeURIComponent(
                 `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">
                     <circle cx="20" cy="20" r="20" fill="#e0e0e0"/>
-                    <text x="20" y="26" text-anchor="middle" font-size="18" fill="#999">${state.user.username[0]}</text>
+                    <text x="20" y="26" text-anchor="middle" font-size="18" fill="#999">${name[0]}</text>
                 </svg>`
             );
         };
@@ -504,8 +519,8 @@ function renderPostCard(post) {
         <div class="post-header">
             <img src="${post.avatar || '/uploads/avatars/default.svg'}" 
                  class="post-avatar" data-user-id="${post.user_id}"
-                 onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#e0e0e0"/><text x="20" y="26" text-anchor="middle" font-size="18" fill="#999">' + post.username[0] + '</text></svg>')}'">
-            <span class="post-author" data-user-id="${post.user_id}">${escapeHtml(post.username)}</span>
+                 onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#e0e0e0"/><text x="20" y="26" text-anchor="middle" font-size="18" fill="#999">' + (post.nickname || post.username)[0] + '</text></svg>')}'">
+            <span class="post-author" data-user-id="${post.user_id}">${escapeHtml(post.nickname || post.username)}</span>
             <span class="post-badge">#${post.id}</span>
             <span class="post-time">${time}</span>
         </div>
@@ -595,17 +610,17 @@ function renderComments(comments) {
     dom.commentList.innerHTML = comments.map(c => `
         <div class="comment-item">
             <img src="${c.avatar || '/uploads/avatars/default.svg'}" class="comment-avatar" data-user-id="${c.user_id}"
-                 onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#e0e0e0"/><text x="16" y="21" text-anchor="middle" font-size="14" fill="#999">' + c.username[0] + '</text></svg>')}'">
+                 onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#e0e0e0"/><text x="16" y="21" text-anchor="middle" font-size="14" fill="#999">' + (c.nickname || c.username)[0] + '</text></svg>')}'">
             <div class="comment-body">
-                <div class="comment-author" data-user-id="${c.user_id}">${escapeHtml(c.username)}</div>
+                <div class="comment-author" data-user-id="${c.user_id}">${escapeHtml(c.nickname || c.username)}</div>
                 <div class="comment-text">${escapeHtml(c.content)}</div>
                 <div class="comment-time">${formatTime(c.created_at)}</div>
                 ${c.replies && c.replies.length > 0 ? c.replies.map(r => `
                     <div class="comment-item" style="margin-top:8px;padding-left:42px;border:none">
                         <img src="${r.avatar || '/uploads/avatars/default.svg'}" class="comment-avatar" data-user-id="${r.user_id}"
-                             onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#e0e0e0"/><text x="16" y="21" text-anchor="middle" font-size="14" fill="#999">' + r.username[0] + '</text></svg>')}'">
+                             onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#e0e0e0"/><text x="16" y="21" text-anchor="middle" font-size="14" fill="#999">' + (r.nickname || r.username)[0] + '</text></svg>')}'">
                         <div class="comment-body" style="margin-left:0">
-                            <div class="comment-author" data-user-id="${r.user_id}">${escapeHtml(r.username)}</div>
+                            <div class="comment-author" data-user-id="${r.user_id}">${escapeHtml(r.nickname || r.username)}</div>
                             <div class="comment-text">${escapeHtml(r.content)}</div>
                             <div class="comment-time">${formatTime(r.created_at)}</div>
                         </div>
@@ -799,7 +814,7 @@ async function loadNotifications() {
                 return `
                 <div class="notif-item ${n.is_read ? '' : 'unread'}" data-post-id="${n.post_id || ''}">
                     <div class="notif-text">
-                        <strong>${escapeHtml(n.actor_username)}</strong> ${text}
+                        <strong>${escapeHtml(n.actor_nickname || n.actor_username)}</strong> ${text}
                     </div>
                     <div class="notif-time">${formatTime(n.created_at)}</div>
                 </div>`;
@@ -881,8 +896,11 @@ async function renderProfile() {
         <div class="profile-header">
             <img src="${state.user.avatar || '/uploads/avatars/default.svg'}" 
                  class="profile-avatar" id="profile-avatar-img"
-                 onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><circle cx="40" cy="40" r="40" fill="#e0e0e0"/><text x="40" y="50" text-anchor="middle" font-size="30" fill="#999">' + state.user.username[0] + '</text></svg>')}'">
-            <div class="profile-username">${escapeHtml(state.user.username)}</div>
+                 onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><circle cx="40" cy="40" r="40" fill="#e0e0e0"/><text x="40" y="50" text-anchor="middle" font-size="30" fill="#999">' + (state.user.nickname || state.user.username)[0] + '</text></svg>')}'">
+            <div class="profile-nickname" id="profile-nickname" contenteditable="true" data-original="${escapeHtml(state.user.nickname || state.user.username)}">
+                ${escapeHtml(state.user.nickname || state.user.username)}
+            </div>
+            <div class="profile-username">@${escapeHtml(state.user.username)}</div>
             <div class="profile-bio" id="profile-bio" contenteditable="true" data-original="${escapeHtml(state.user.bio || '')}">
                 ${state.user.bio ? escapeHtml(state.user.bio) : '这个人很懒，什么都没写...'}
             </div>
@@ -947,6 +965,32 @@ async function renderProfile() {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 bioDiv.blur();
+            }
+        });
+    }
+
+    // 修改昵称
+    const nickDiv = $('#profile-nickname');
+    if (nickDiv) {
+        const saveNickname = async () => {
+            const newNick = nickDiv.innerText.trim();
+            const originalNick = nickDiv.dataset.original;
+            if (newNick === originalNick) return;
+            try {
+                const result = await api('POST', '/user/nickname', { nickname: newNick });
+                state.user.nickname = result.nickname;
+                nickDiv.dataset.original = newNick;
+                showToast('昵称已更新');
+            } catch (e) {
+                showToast(e.message);
+                nickDiv.innerText = originalNick;
+            }
+        };
+        nickDiv.addEventListener('blur', saveNickname);
+        nickDiv.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                nickDiv.blur();
             }
         });
     }
@@ -1022,14 +1066,15 @@ async function renderUserProfile(userId) {
                 </div>
                 <img src="${user.avatar || '/uploads/avatars/default.svg'}" 
                      class="profile-avatar"
-                     onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><circle cx="40" cy="40" r="40" fill="#e0e0e0"/><text x="40" y="50" text-anchor="middle" font-size="30" fill="#999">' + user.username[0] + '</text></svg>')}'">
-                <div class="profile-username">${escapeHtml(user.username)}</div>
+                     onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><circle cx="40" cy="40" r="40" fill="#e0e0e0"/><text x="40" y="50" text-anchor="middle" font-size="30" fill="#999">' + (user.nickname || user.username)[0] + '</text></svg>')}'">
+                <div class="profile-nickname">${escapeHtml(user.nickname || user.username)}</div>
+                <div class="profile-username">@${escapeHtml(user.username)}</div>
                 <div class="profile-bio">${user.bio ? escapeHtml(user.bio) : '这个人很懒，什么都没写...'}</div>
                 <div class="profile-stats">
                     <div class="stat"><div class="stat-num">${user.posts_count || 0}</div><div class="stat-label">动态</div></div>
                 </div>
             </div>
-            <div class="section-title">${escapeHtml(user.username)} 的动态</div>
+            <div class="section-title">${escapeHtml(user.nickname || user.username)} 的动态</div>
             <div id="user-posts"></div>
         `;
 

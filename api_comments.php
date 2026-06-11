@@ -29,7 +29,7 @@ function handleCommentsList(int $postId): void {
 
     $stmt = $pdo->prepare(
         'SELECT c.id, c.content, c.parent_id, c.created_at,
-                u.id AS user_id, u.username, u.avatar
+                u.id AS user_id, u.username, u.nickname, u.avatar
          FROM comments c
          JOIN users u ON c.user_id = u.id
          WHERE c.post_id = ? AND c.parent_id IS NULL
@@ -47,7 +47,7 @@ function handleCommentsList(int $postId): void {
         // 加载子评论（回复）
         $stmt2 = $pdo->prepare(
             'SELECT c.id, c.content, c.parent_id, c.created_at,
-                    u.id AS user_id, u.username, u.avatar
+                    u.id AS user_id, u.username, u.nickname, u.avatar
              FROM comments c
              JOIN users u ON c.user_id = u.id
              WHERE c.parent_id = ?
@@ -127,7 +127,7 @@ function handleCommentsCreate(int $postId): void {
 
     $stmt = $pdo->prepare(
         'SELECT c.id, c.content, c.parent_id, c.created_at,
-                u.id AS user_id, u.username, u.avatar
+                u.id AS user_id, u.username, u.nickname, u.avatar
          FROM comments c
          JOIN users u ON c.user_id = u.id
          WHERE c.id = ?'

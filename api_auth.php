@@ -5,16 +5,23 @@
 
 /**
  * POST /auth/register
- * Body: { "username": "...", "password": "..." }
+ * Body: { "username": "...", "nickname": "...", "password": "..." }
  */
 function handleAuthRegister(): void {
     assertMethod('POST');
-    $data   = getJsonBody();
+    $data     = getJsonBody();
     $username = trim($data['username'] ?? '');
+    $nickname = trim($data['nickname'] ?? '');
     $password = $data['password'] ?? '';
 
     if (strlen($username) < 2 || strlen($username) > 50) {
         error('用户名长度需在 2-50 个字符之间');
+    }
+    if ($nickname === '') {
+        error('昵称不能为空');
+    }
+    if (strlen($nickname) < 2 || strlen($nickname) > 50) {
+        error('昵称长度需在 2-50 个字符之间');
     }
     if (strlen($password) < 6) {
         error('密码长度不能少于 6 位');
@@ -32,9 +39,17 @@ function handleAuthRegister(): void {
         error('用户名已被注册');
     }
 
+    // 检查昵称是否与已有用户名或昵称冲突（不区分大小写）
+    // utf8mb4_unicode_ci 默认不区分大小写
+    $stmt = $pdo->prepare('SELECT id FROM users WHERE nickname = ? OR username = ?');
+    $stmt->execute([$nickname, $nickname]);
+    if ($stmt->fetch()) {
+        error('昵称已被使用');
+    }
+
     $hash = password_hash($password, PASSWORD_BCRYPT);
-    $stmt = $pdo->prepare('INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, NOW())');
-    $stmt->execute([$username, $hash]);
+    $stmt = $pdo->prepare('INSERT INTO users (username, nickname, password_hash, created_at) VALUES (?, ?, ?, NOW())');
+    $stmt->execute([$username, $nickname, $hash]);
     $userId = (int)$pdo->lastInsertId();
 
     // 生成 Token
@@ -43,6 +58,7 @@ function handleAuthRegister(): void {
     success([
         'id'       => $userId,
         'username' => $username,
+        'nickname' => $nickname,
         'avatar'   => null,
         'token'    => $token,
     ], '注册成功');
@@ -51,20 +67,24 @@ function handleAuthRegister(): void {
 /**
  * POST /auth/login
  * Body: { "username": "...", "password": "..." }
+ * 支持使用用户名或昵称登录
  */
 function handleAuthLogin(): void {
     assertMethod('POST');
     $data     = getJsonBody();
-    $username = trim($data['username'] ?? '');
+    $account  = trim($data['username'] ?? '');
     $password = $data['password'] ?? '';
 
-    if ($username === '' || $password === '') {
+    if ($account === '' || $password === '') {
         error('用户名和密码不能为空');
     }
 
     $pdo  = getDB();
-    $stmt = $pdo->prepare('SELECT id, username, avatar, bio, password_hash FROM users WHERE username = ?');
-    $stmt->execute([$username]);
+    // 支持通过用户名或昵称登录
+    $stmt = $pdo->prepare(
+        'SELECT id, username, nickname, avatar, bio, password_hash FROM users WHERE username = ? OR nickname = ?'
+    );
+    $stmt->execute([$account, $account]);
     $user = $stmt->fetch();
 
     if (!$user || !password_verify($password, $user['password_hash'])) {
@@ -77,6 +97,7 @@ function handleAuthLogin(): void {
     success([
         'id'       => (int)$user['id'],
         'username' => $user['username'],
+        'nickname' => $user['nickname'],
         'avatar'   => $user['avatar'],
         'bio'      => $user['bio'],
         'token'    => $token,

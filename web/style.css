@@ -574,8 +574,12 @@ md-dialog [slot="headline"] {
     object-fit: cover; background: #e0e0e0;
     margin-bottom: 12px; cursor: pointer;
 }
+.profile-nickname {
+    font-size: 22px; font-weight: 600; margin-bottom: 2px;
+}
 .profile-username {
-    font-size: 22px; font-weight: 600; margin-bottom: 4px;
+    font-size: 14px; color: var(--md-sys-color-on-surface-variant);
+    margin-bottom: 4px;
 }
 .profile-bio {
     color: var(--md-sys-color-on-surface-variant);

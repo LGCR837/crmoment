@@ -58,6 +58,8 @@ try {
         handleUserMe();
     } elseif ($path === '/user/bio' && $method === 'POST') {
         handleUserBio();
+    } elseif ($path === '/user/nickname' && $method === 'POST') {
+        handleUserNickname();
     } elseif ($path === '/user/avatar' && $method === 'POST') {
         handleUserAvatar();
     } elseif (preg_match('#^/user/(\d+)$#', $path, $m) && $method === 'GET') {

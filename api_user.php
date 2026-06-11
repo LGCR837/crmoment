@@ -11,7 +11,7 @@ function handleUserMe(): void {
     $userId = requireLogin();
 
     $pdo  = getDB();
-    $stmt = $pdo->prepare('SELECT id, username, avatar, bio, created_at FROM users WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT id, username, nickname, avatar, bio, created_at FROM users WHERE id = ?');
     $stmt->execute([$userId]);
     $user = $stmt->fetch();
 
@@ -30,7 +30,7 @@ function handleUserShow(int $id): void {
     assertMethod('GET');
 
     $pdo  = getDB();
-    $stmt = $pdo->prepare('SELECT id, username, avatar, bio, created_at FROM users WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT id, username, nickname, avatar, bio, created_at FROM users WHERE id = ?');
     $stmt->execute([$id]);
     $user = $stmt->fetch();
 
@@ -105,4 +105,43 @@ function handleUserBio(): void {
     }
 
     success(['bio' => $bio]);
+}
+
+/**
+ * POST /user/nickname
+ * 修改昵称
+ */
+function handleUserNickname(): void {
+    assertMethod('POST');
+    $userId = requireLogin();
+
+    $body = getJsonBody();
+
+    $nickname = trim($body['nickname'] ?? '');
+    if ($nickname === '') {
+        error('昵称不能为空');
+    }
+    if (mb_strlen($nickname) > 50 || mb_strlen($nickname) < 2) {
+        error('昵称长度需在 2-50 个字符之间');
+    }
+
+    $pdo = getDB();
+
+    // 检查昵称是否与别人冲突（不区分大小写，但允许与自己的用户名相同）
+    $stmt = $pdo->prepare(
+        'SELECT id FROM users WHERE id != ? AND (nickname = ? OR username = ?)'
+    );
+    $stmt->execute([$userId, $nickname, $nickname]);
+    if ($stmt->fetch()) {
+        error('该昵称已被使用');
+    }
+
+    $stmt = $pdo->prepare('UPDATE users SET nickname = ? WHERE id = ?');
+    $stmt->execute([$nickname, $userId]);
+
+    if ($stmt->rowCount() === 0) {
+        error('更新失败，请稍后重试');
+    }
+
+    success(['nickname' => $nickname]);
 }

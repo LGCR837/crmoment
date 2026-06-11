@@ -8,12 +8,17 @@ USE serad2nim77d3wq;
 CREATE TABLE IF NOT EXISTS `users` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `username` VARCHAR(50) NOT NULL UNIQUE,
+    `nickname` VARCHAR(50) DEFAULT NULL COMMENT '昵称',
     `password_hash` VARCHAR(255) NOT NULL,
     `avatar` VARCHAR(255) DEFAULT NULL COMMENT '头像路径',
     `bio` VARCHAR(200) DEFAULT NULL COMMENT '个人简介',
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-    INDEX `idx_username` (`username`)
+    INDEX `idx_username` (`username`),
+    INDEX `idx_nickname` (`nickname`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 迁移说明：已有用户的 nickname 需手动设置为与 username 相同
+-- ALTER TABLE users ADD COLUMN nickname VARCHAR(50) DEFAULT NULL AFTER username, ADD INDEX idx_nickname (nickname);
 
 -- 动态表
 CREATE TABLE IF NOT EXISTS `posts` (

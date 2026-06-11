@@ -22,7 +22,7 @@ function handleNotificationsList(): void {
 
     $stmt = $pdo->prepare(
         'SELECT n.id, n.type, n.post_id, n.is_read, n.created_at,
-                u.id AS actor_id, u.username AS actor_username, u.avatar AS actor_avatar
+                u.id AS actor_id, u.username AS actor_username, u.nickname AS actor_nickname, u.avatar AS actor_avatar
          FROM notifications n
          JOIN users u ON n.actor_id = u.id
          WHERE n.user_id = ?

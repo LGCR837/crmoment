@@ -22,7 +22,7 @@ function handlePostsList(): void {
     // 获取列表（含作者信息）
     $stmt = $pdo->prepare(
         'SELECT p.id, p.content, p.images, p.likes_count, p.comments_count, p.created_at,
-                u.id AS user_id, u.username, u.avatar
+                u.id AS user_id, u.username, u.nickname, u.avatar
          FROM posts p
          JOIN users u ON p.user_id = u.id
          ORDER BY p.created_at DESC
@@ -74,7 +74,7 @@ function handlePostsShow(int $id): void {
     $pdo  = getDB();
     $stmt = $pdo->prepare(
         'SELECT p.id, p.content, p.images, p.likes_count, p.comments_count, p.created_at,
-                u.id AS user_id, u.username, u.avatar
+                u.id AS user_id, u.username, u.nickname, u.avatar
          FROM posts p
          JOIN users u ON p.user_id = u.id
          WHERE p.id = ?'
@@ -104,7 +104,7 @@ function handlePostsShow(int $id): void {
     // 获取评论（前 10 条）
     $stmt = $pdo->prepare(
         'SELECT c.id, c.content, c.parent_id, c.created_at,
-                u.id AS user_id, u.username, u.avatar
+                u.id AS user_id, u.username, u.nickname, u.avatar
          FROM comments c
          JOIN users u ON c.user_id = u.id
          WHERE c.post_id = ?
