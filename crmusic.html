@@ -89,6 +89,23 @@
             transition: opacity 0.2s ease;
         }
 
+        /* WebKit 音频控件：透明背景 + 颜色跟随歌词 */
+        :root {
+            --audio-filter: brightness(0) invert(1);
+        }
+        body.dark-lrc {
+            --audio-filter: brightness(0.3);
+        }
+        audio::-webkit-media-controls-panel,
+        audio::-webkit-media-controls-enclosure,
+        audio::-webkit-media-controls {
+            background: transparent !important;
+            background-color: transparent !important;
+        }
+        audio {
+            filter: var(--audio-filter);
+        }
+
         audio.audio-hidden {
             opacity: 0;
             pointer-events: none;
