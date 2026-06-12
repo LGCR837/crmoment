@@ -201,7 +201,13 @@
                 let arr = line.split("]");
                 if (!arr[1]) return;
                 let timeParts = arr[0].substring(1).split(":");
-                let time = +timeParts[0] * 60 + +timeParts[1];
+                // 支持 [mm:ss.xx], [hh:mm:ss.xx], [mm:ss.xxx] 等格式
+                let time = 0;
+                if (timeParts.length === 3) {
+                    time = +timeParts[0] * 3600 + +timeParts[1] * 60 + +timeParts[2];
+                } else {
+                    time = +timeParts[0] * 60 + +timeParts[1];
+                }
                 result.push({ time: time, text: arr[1] });
             });
             return result;
