@@ -210,10 +210,10 @@ function handlePostsDelete(int $id): void {
         error('无权删除此动态', 403);
     }
 
-    // 8 分钟撤回时限
+    // 24 小时撤回时限
     $createdAt = strtotime($post['created_at'] . ' UTC');
-    if (!$createdAt || time() - $createdAt > 480) {
-        error('已超过 8 分钟，无法撤回', 403);
+    if (!$createdAt || time() - $createdAt > 86400) {
+        error('已超过 24 小时，无法撤回', 403);
     }
 
     // 删除关联图片文件

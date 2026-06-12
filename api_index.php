@@ -15,6 +15,7 @@ require_once __DIR__ . '/api_comments.php';
 require_once __DIR__ . '/api_notifications.php';
 require_once __DIR__ . '/api_upload.php';
 require_once __DIR__ . '/api_conversations.php';
+require_once __DIR__ . '/api_music.php';
 
 // 解析请求路径
 $method = $_SERVER['REQUEST_METHOD'];
@@ -117,6 +118,18 @@ try {
     // ---- Upload ----
     } elseif ($path === '/upload/image' && $method === 'POST') {
         handleUploadImage();
+
+    // ---- Music ----
+    } elseif ($path === '/music' && $method === 'GET') {
+        handleMusicList();
+    } elseif ($path === '/music' && $method === 'POST') {
+        handleMusicCreate();
+    } elseif (preg_match('#^/music/(\d+)/play$#', $path, $m) && $method === 'POST') {
+        handleMusicPlay((int)$m[1]);
+    } elseif (preg_match('#^/music/(\d+)$#', $path, $m) && $method === 'PUT') {
+        handleMusicUpdate((int)$m[1]);
+    } elseif (preg_match('#^/music/(\d+)$#', $path, $m) && $method === 'DELETE') {
+        handleMusicDelete((int)$m[1]);
 
     } else {
         error('接口不存在', 404);

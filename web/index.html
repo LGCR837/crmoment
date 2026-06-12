@@ -229,6 +229,73 @@
         </div>
     </md-dialog>
 
+    <!-- 添加音乐对话框 -->
+    <md-dialog id="add-music-dialog">
+        <div slot="headline">添加音乐</div>
+        <form slot="content" id="add-music-form" method="dialog">
+            <md-outlined-text-field
+                id="music-title"
+                label="音乐名称"
+                type="text"
+                required
+                minlength="1"
+                maxlength="200"
+                class="auth-field"
+            ></md-outlined-text-field>
+            <md-outlined-text-field
+                id="music-url"
+                label="音频链接"
+                type="url"
+                required
+                class="auth-field"
+            ></md-outlined-text-field>
+            <md-outlined-text-field
+                id="music-lrc-url"
+                label="歌词文件链接"
+                type="url"
+                required
+                class="auth-field"
+            ></md-outlined-text-field>
+            <md-outlined-text-field
+                id="music-bg-url"
+                label="背景图片链接（可选）"
+                type="url"
+                class="auth-field"
+            ></md-outlined-text-field>
+            <div style="margin-top:8px;font-size:14px;color:var(--md-sys-color-on-surface-variant);margin-bottom:4px;">歌词位置</div>
+            <div class="lrc-pos-group">
+                <label class="lrc-pos-option">
+                    <input type="radio" name="lrc_pos" value="left" class="lrc-pos-radio">
+                    <span>左侧</span>
+                </label>
+                <label class="lrc-pos-option">
+                    <input type="radio" name="lrc_pos" value="center" checked class="lrc-pos-radio">
+                    <span>居中</span>
+                </label>
+                <label class="lrc-pos-option">
+                    <input type="radio" name="lrc_pos" value="right" class="lrc-pos-radio">
+                    <span>右侧</span>
+                </label>
+            </div>
+            <div style="margin-top:8px;font-size:14px;color:var(--md-sys-color-on-surface-variant);margin-bottom:4px;">歌词颜色</div>
+            <div class="lrc-pos-group">
+                <label class="lrc-pos-option">
+                    <input type="radio" name="lrc_color" value="light" checked class="lrc-pos-radio">
+                    <span>浅色</span>
+                </label>
+                <label class="lrc-pos-option">
+                    <input type="radio" name="lrc_color" value="dark" class="lrc-pos-radio">
+                    <span>深色</span>
+                </label>
+            </div>
+            <div id="add-music-error" class="error-message" style="display:none"></div>
+        </form>
+        <div slot="actions">
+            <md-text-button id="add-music-cancel">取消</md-text-button>
+            <md-filled-button id="add-music-submit">添加</md-filled-button>
+        </div>
+    </md-dialog>
+
     <!-- MWC 初始化 + 应用入口（使用绝对路径） -->
     <script type="module" src="/web/app.js"></script>
 </body>

@@ -626,6 +626,101 @@ md-dialog [slot="headline"] {
     padding-top: 8px;
 }
 
+/* ===== 音乐广场 ===== */
+.music-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 24px;
+    margin-bottom: 16px;
+}
+.music-section-header .section-title {
+    margin-bottom: 0;
+    padding-top: 0;
+}
+.music-card {
+    background: var(--md-sys-color-surface-container-low);
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: var(--md-elevation-level1);
+    transition: box-shadow 0.2s ease;
+    cursor: pointer;
+    margin-bottom: 12px;
+}
+.music-card:hover {
+    box-shadow: var(--md-elevation-level2);
+}
+.music-card-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--md-sys-color-on-surface);
+    margin-bottom: 8px;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.music-card-meta {
+    font-size: 13px;
+    color: var(--md-sys-color-on-surface-variant);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.music-card-author {
+    color: var(--md-sys-color-primary);
+    cursor: pointer;
+    font-weight: 500;
+}
+.music-card-author:hover {
+    text-decoration: underline;
+}
+.music-card-plays {
+    font-size: 13px;
+}
+.music-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
+}
+
+/* ===== 歌词位置单选按钮 ===== */
+.lrc-pos-group {
+    display: flex;
+    gap: 0;
+    border-radius: 28px;
+    overflow: hidden;
+    border: 1px solid var(--md-sys-color-outline);
+    background: transparent;
+    margin-top: 4px;
+}
+.lrc-pos-option {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 6px 12px;
+    font-size: 14px;
+    color: var(--md-sys-color-on-surface-variant);
+    transition: background 0.2s, color 0.2s;
+    user-select: none;
+    border-right: 1px solid var(--md-sys-color-outline);
+}
+.lrc-pos-option:last-child {
+    border-right: none;
+}
+.lrc-pos-radio {
+    display: none;
+}
+.lrc-pos-option:has(.lrc-pos-radio:checked) {
+    background: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+    font-weight: 500;
+}
+
 /* ===== 错误提示 ===== */
 .error-toast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);

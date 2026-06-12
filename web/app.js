@@ -48,7 +48,9 @@ const state = {
     hasMore: true,
     loading: false,
     currentPage: 'home',      // home / messages / profile / explore / user / chat
-    viewUserId: null,         // 正在查看的用户 ID（当 currentPage === 'user'）
+    viewUserId: null,
+    music: [],                // 音乐广场列表
+    editingMusicId: null,     // 正在编辑的音乐 ID（null 表示添加模式）
     commentPostId: null,      // 正在查看评论的动态 ID
     selectedImages: [],       // 待上传图片
     conversations: [],        // 会话列表
@@ -114,6 +116,14 @@ const dom = {
     createGroupCancel: $('#create-group-cancel'),
     msgBadge: $('#msg-badge'),
     navMessages: $('#nav-messages'),
+    addMusicDialog: $('#add-music-dialog'),
+    musicTitle: $('#music-title'),
+    musicUrl: $('#music-url'),
+    musicLrcUrl: $('#music-lrc-url'),
+    musicBgUrl: $('#music-bg-url'),
+    addMusicError: $('#add-music-error'),
+    addMusicSubmit: $('#add-music-submit'),
+    addMusicCancel: $('#add-music-cancel'),
 };
 
 // ===== API 请求 =====
@@ -1224,7 +1234,7 @@ async function renderUserProfile(userId) {
 }
 
 // ===== 发现页 =====
-function renderExplore() {
+async function renderExplore() {
     dom.main.innerHTML = `
         <div class="section-title">发现</div>
         <div class="card" style="background:var(--md-sys-color-surface-container-low);border-radius:16px;padding:24px;box-shadow:var(--md-elevation-level1);text-align:center;">
@@ -1247,12 +1257,221 @@ function renderExplore() {
                 ` : ''}
             </div>
         </div>
+
+        <!-- 音乐广场 -->
+        <div class="music-section-header">
+            <div class="section-title"><md-icon style="font-size:20px;vertical-align:middle;margin-right:4px;">music_note</md-icon> 音乐广场</div>
+            ${state.user ? '<md-filled-tonal-button id="btn-add-music"><md-icon slot="icon">add</md-icon>添加音乐</md-filled-tonal-button>' : ''}
+        </div>
+        <div id="music-list"></div>
+        <div id="music-loading" class="loading-indicator"><md-circular-progress indeterminate></md-circular-progress></div>
     `;
+
     $('#explore-home-btn')?.addEventListener('click', () => navigateTo('home'));
     $('#explore-login-btn')?.addEventListener('click', () => {
         switchAuthMode('login');
         dialogOpen(dom.authDialog);
     });
+    $('#btn-add-music')?.addEventListener('click', openAddMusicDialog);
+
+    // 加载音乐列表
+    await loadMusic();
+}
+
+/**
+ * 加载音乐列表
+ */
+async function loadMusic() {
+    try {
+        const data = await api('GET', '/music?page=1&size=50');
+        state.music = data.list || [];
+    } catch (_) {
+        state.music = [];
+    }
+    renderMusicList();
+}
+
+/**
+ * 渲染音乐卡片列表
+ */
+function renderMusicList() {
+    const container = $('#music-list');
+    const loading = $('#music-loading');
+    if (!container) return;
+    if (loading) loading.style.display = 'none';
+
+    if (state.music.length === 0) {
+        container.innerHTML = '<p style="color:var(--md-sys-color-on-surface-variant);text-align:center;padding:24px;">还没有音乐，快来添加第一首吧</p>';
+        return;
+    }
+
+    container.innerHTML = state.music.map(item => {
+        const displayName = escapeHtml(item.nickname || item.username);
+        const timeStr = formatTime(item.created_at);
+        const params = new URLSearchParams({
+            id: item.id,
+            music: item.music_url,
+            lrc: item.lrc_url,
+        });
+        if (item.bg_url) params.set('bg', item.bg_url);
+        if (item.lrc_pos && item.lrc_pos !== 'center') params.set('lrc_pos', item.lrc_pos);
+        if (item.lrc_color && item.lrc_color !== 'light') params.set('lrc_color', item.lrc_color);
+        const musicUrl = '/crmusic.php?' + params.toString();
+        const isOwner = state.user && String(item.user_id) === String(state.user.id);
+
+        return `
+            <div class="music-card" data-music-url="${escapeHtml(musicUrl)}">
+                <div class="music-card-title">${escapeHtml(item.title)}</div>
+                <div class="music-card-meta">
+                    <span class="music-card-author" data-user-id="${item.user_id}">${displayName}</span>
+                    <span class="music-card-plays">${item.plays_count} 次播放</span>
+                    <span>${timeStr}</span>
+                    ${isOwner ? `
+                    <span class="music-actions">
+                        <md-text-button class="music-edit-btn" data-id="${item.id}" style="--md-text-button-container-shape:8px;--md-text-button-container-height:28px;font-size:12px;min-width:0;">
+                            <md-icon slot="icon" style="font-size:16px;">edit</md-icon>
+                            编辑
+                        </md-text-button>
+                        <md-text-button class="music-del-btn" data-id="${item.id}" style="--md-text-button-container-shape:8px;--md-text-button-container-height:28px;font-size:12px;min-width:0;color:var(--md-sys-color-error);">
+                            <md-icon slot="icon" style="font-size:16px;">delete</md-icon>
+                            删除
+                        </md-text-button>
+                    </span>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // 点击卡片 → 跳转到音乐播放页
+    container.querySelectorAll('.music-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+            // 如果点击的是作者名字，不要跳转音乐，而是跳转个人主页
+            if (e.target.closest('.music-card-author')) return;
+            const url = card.dataset.musicUrl;
+            if (url) window.open(url, '_blank');
+        });
+    });
+
+    // 点击作者 → 跳转个人主页
+    container.querySelectorAll('.music-card-author').forEach(el => {
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const userId = parseInt(el.dataset.userId);
+            if (userId) navigateToUserProfile(userId);
+        });
+    });
+
+    // 编辑音乐
+    container.querySelectorAll('.music-edit-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = parseInt(btn.dataset.id);
+            const item = state.music.find(m => m.id === id);
+            if (item) openAddMusicDialog(item);
+        });
+    });
+
+    // 删除音乐
+    container.querySelectorAll('.music-del-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const id = parseInt(btn.dataset.id);
+            if (!confirm('确定要删除这首音乐吗？')) return;
+            try {
+                await api('DELETE', '/music/' + id);
+                showToast('删除成功');
+                await loadMusic();
+            } catch (err) {
+                showToast(err.message || '删除失败');
+            }
+        });
+    });
+}
+
+/**
+ * 打开添加音乐对话框
+ * @param {object|null} editItem - 编辑模式时传入要编辑的音乐对象
+ */
+function openAddMusicDialog(editItem) {
+    if (!state.user) {
+        showToast('请先登录');
+        return;
+    }
+    state.editingMusicId = editItem ? editItem.id : null;
+    // 清空/填充输入（必须传字符串，MWC 遇到 undefined 会显示 "undefined"）
+    dom.musicTitle.value = editItem ? (editItem.title || '') : '';
+    dom.musicUrl.value = editItem ? (editItem.music_url || '') : '';
+    dom.musicLrcUrl.value = editItem ? (editItem.lrc_url || '') : '';
+    dom.musicBgUrl.value = editItem ? (editItem.bg_url || '') : '';
+    // 歌词位置
+    const pos = editItem ? (editItem.lrc_pos || 'center') : 'center';
+    const posRadio = document.querySelector(`.lrc-pos-radio[name="lrc_pos"][value="${pos}"]`);
+    if (posRadio) posRadio.checked = true;
+    // 歌词颜色
+    const color = editItem ? (editItem.lrc_color || 'light') : 'light';
+    const colorRadio = document.querySelector(`.lrc-pos-radio[name="lrc_color"][value="${color}"]`);
+    if (colorRadio) colorRadio.checked = true;
+    dom.addMusicError.style.display = 'none';
+    // 修改对话框标题和按钮文字
+    const headline = dom.addMusicDialog.querySelector('[slot="headline"]');
+    if (headline) headline.textContent = editItem ? '编辑音乐' : '添加音乐';
+    dom.addMusicSubmit.label = editItem ? '保存' : '添加';
+    dialogOpen(dom.addMusicDialog);
+}
+
+/**
+ * 处理添加音乐
+ */
+async function handleAddMusic() {
+    const title = dom.musicTitle.value.trim();
+    const musicUrl = dom.musicUrl.value.trim();
+    const lrcUrl = dom.musicLrcUrl.value.trim();
+    const bgUrl = dom.musicBgUrl.value.trim();
+    const lrcPos = (document.querySelector('.lrc-pos-radio[name="lrc_pos"]:checked')?.value) || 'center';
+    const lrcColor = (document.querySelector('.lrc-pos-radio[name="lrc_color"]:checked')?.value) || 'light';
+
+    if (!title) {
+        dom.addMusicError.textContent = '请输入音乐名称';
+        dom.addMusicError.style.display = '';
+        return;
+    }
+    if (!musicUrl) {
+        dom.addMusicError.textContent = '请输入音频链接';
+        dom.addMusicError.style.display = '';
+        return;
+    }
+    if (!lrcUrl) {
+        dom.addMusicError.textContent = '请输入歌词文件链接';
+        dom.addMusicError.style.display = '';
+        return;
+    }
+
+    try {
+        dom.addMusicSubmit.label = '处理中...';
+        dom.addMusicSubmit.disabled = true;
+        const body = { title, music_url: musicUrl, lrc_url: lrcUrl, bg_url: bgUrl || undefined, lrc_pos: lrcPos, lrc_color: lrcColor };
+        const isEdit = !!state.editingMusicId;
+        if (isEdit) {
+            await api('PUT', '/music/' + state.editingMusicId, body);
+            state.editingMusicId = null;
+            showToast('修改成功');
+        } else {
+            await api('POST', '/music', body);
+            showToast('添加成功');
+        }
+        dialogClose(dom.addMusicDialog);
+        // 重新加载音乐列表
+        await loadMusic();
+    } catch (e) {
+        dom.addMusicError.textContent = e.message || '操作失败';
+        dom.addMusicError.style.display = '';
+    } finally {
+        // 如果对话框还开着（失败分支），保留正确的按钮文字
+        const stillEditing = !!state.editingMusicId;
+        dom.addMusicSubmit.label = stillEditing ? '保存' : '添加';
+        dom.addMusicSubmit.disabled = false;
+    }
 }
 
 // ===== 聊天子系统 =====
@@ -2119,6 +2338,17 @@ async function init() {
         const saved = localStorage.getItem('crmoment-theme');
         if (saved !== 'dark' && saved !== 'light') {
             applyTheme(e.matches ? 'dark' : 'light');
+        }
+    });
+
+    // 添加音乐对话框事件
+    dom.addMusicSubmit?.addEventListener('click', handleAddMusic);
+    dom.addMusicCancel?.addEventListener('click', () => dialogClose(dom.addMusicDialog));
+    // 回车提交
+    dom.addMusicDialog?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleAddMusic();
         }
     });
 

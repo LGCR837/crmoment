@@ -108,6 +108,23 @@ CREATE TABLE IF NOT EXISTS `messages` (
     FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 音乐表（音乐广场）
+CREATE TABLE IF NOT EXISTS `music` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `user_id` INT UNSIGNED NOT NULL,
+    `title` VARCHAR(200) NOT NULL COMMENT '音乐名称',
+    `music_url` VARCHAR(500) NOT NULL COMMENT '音频直链',
+    `lrc_url` VARCHAR(500) DEFAULT NULL COMMENT '歌词文件直链',
+    `bg_url` VARCHAR(500) DEFAULT NULL COMMENT '背景图片直链',
+    `lrc_pos` VARCHAR(10) DEFAULT 'center' COMMENT '歌词位置 left/center/right',
+    `lrc_color` VARCHAR(10) DEFAULT 'light' COMMENT '歌词颜色 light/dark',
+    `plays_count` INT UNSIGNED DEFAULT 0 COMMENT '播放量',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_user_id` (`user_id`),
+    INDEX `idx_created_at` (`created_at`),
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 通知表
 CREATE TABLE IF NOT EXISTS `notifications` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
