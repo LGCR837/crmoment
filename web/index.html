@@ -296,6 +296,21 @@
         </div>
     </md-dialog>
 
+    <!-- 搜索音乐对话框 -->
+    <md-dialog id="search-music-dialog">
+        <div slot="headline">搜索音乐</div>
+        <div slot="content">
+            <md-outlined-text-field id="music-search" label="搜索音乐名称" type="search" class="auth-field"></md-outlined-text-field>
+        </div>
+        <div slot="actions" style="justify-content:space-between;">
+            <md-text-button id="search-music-clear">清空</md-text-button>
+            <div>
+                <md-text-button id="search-music-cancel">取消</md-text-button>
+                <md-filled-button id="search-music-submit">搜索</md-filled-button>
+            </div>
+        </div>
+    </md-dialog>
+
     <!-- MWC 初始化 + 应用入口（使用绝对路径） -->
     <script type="module" src="/web/app.js"></script>
 </body>

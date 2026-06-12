@@ -32,12 +32,33 @@ function fixButtonPadding() {
     }
 }
 
-// 页面变化后重新修复新创建的按钮
+/** 监听 DOM 变化，自动修复新按钮的 padding */
 function setupPadObserver() {
     const observer = new MutationObserver(() => fixButtonPadding());
     observer.observe(document.body, { childList: true, subtree: true });
     fixButtonPadding();
 }
+
+// ===== 音乐广场 =====
+
+/**
+ * 加载音乐列表（使用 state.musicSearchQuery 作为关键词）
+ */
+async function loadMusic() {
+    const listEl = $('#music-list');
+    if (listEl) listEl.classList.add('music-loading');
+    try {
+        const q = state.musicSearchQuery || '';
+        const url = q ? '/music?page=1&size=50&q=' + encodeURIComponent(q) : '/music?page=1&size=50';
+        const data = await api('GET', url);
+        state.music = data.list || [];
+    } catch (_) {
+        state.music = [];
+    }
+    if (listEl) listEl.classList.remove('music-loading');
+    renderMusicList();
+}
+
 const API_BASE = '/api.php?route=';
 
 // ===== 状态管理 =====
@@ -50,6 +71,7 @@ const state = {
     currentPage: 'home',      // home / messages / profile / explore / user / chat
     viewUserId: null,
     music: [],                // 音乐广场列表
+    musicSearchQuery: '',     // 音乐搜索关键词
     editingMusicId: null,     // 正在编辑的音乐 ID（null 表示添加模式）
     commentPostId: null,      // 正在查看评论的动态 ID
     selectedImages: [],       // 待上传图片
@@ -562,17 +584,14 @@ function renderPostCard(post) {
     const likedClass = post.is_liked ? 'liked' : '';
     const postUrl = `https://crmoment.ccwu.cc/web#${post.id}`;
 
-    // 判断是否可撤回（自己的动态 & 8 分钟内）
+    // 判断是否可撤回（自己 & 24 小时内）
     let canRecall = false;
     if (state.user) {
         const isOwner = String(post.user_id) === String(state.user.id);
-        console.log('🔍 recall check:', { postId: post.id, postUserId: post.user_id, myUserId: state.user.id, isOwner, createdAt: post.created_at });
         if (isOwner) {
             const postTime = new Date(post.created_at?.replace(' ', 'T') + 'Z').getTime();
             const ageMs = Date.now() - postTime;
-            const ageMin = Math.floor(ageMs / 60000);
-            console.log('⏱ recall time:', { postTime, ageMs, ageMin, within8min: ageMs < 8 * 60 * 1000 });
-            canRecall = ageMs < 8 * 60 * 1000;
+            canRecall = ageMs < 24 * 60 * 60 * 1000;
         }
     }
     const recallHtml = canRecall ? `
@@ -1261,7 +1280,13 @@ async function renderExplore() {
         <!-- 音乐广场 -->
         <div class="music-section-header">
             <div class="section-title"><md-icon style="font-size:20px;vertical-align:middle;margin-right:4px;">music_note</md-icon> 音乐广场</div>
-            ${state.user ? '<md-filled-tonal-button id="btn-add-music"><md-icon slot="icon">add</md-icon>添加音乐</md-filled-tonal-button>' : ''}
+            <div class="music-header-actions">
+                <md-filled-tonal-button id="btn-search-music" style="--md-filled-tonal-button-container-shape:28px;--md-filled-tonal-button-container-height:36px;">
+                    <md-icon slot="icon">search</md-icon>
+                    搜索
+                </md-filled-tonal-button>
+                ${state.user ? '<md-filled-tonal-button id="btn-add-music" style="--md-filled-tonal-button-container-shape:28px;--md-filled-tonal-button-container-height:36px;"><md-icon slot="icon">add</md-icon>添加音乐</md-filled-tonal-button>' : ''}
+            </div>
         </div>
         <div id="music-list"></div>
         <div id="music-loading" class="loading-indicator"><md-circular-progress indeterminate></md-circular-progress></div>
@@ -1273,6 +1298,7 @@ async function renderExplore() {
         dialogOpen(dom.authDialog);
     });
     $('#btn-add-music')?.addEventListener('click', openAddMusicDialog);
+    $('#btn-search-music')?.addEventListener('click', openSearchDialog);
 
     // 加载音乐列表
     await loadMusic();
@@ -1281,14 +1307,28 @@ async function renderExplore() {
 /**
  * 加载音乐列表
  */
-async function loadMusic() {
-    try {
-        const data = await api('GET', '/music?page=1&size=50');
-        state.music = data.list || [];
-    } catch (_) {
-        state.music = [];
-    }
-    renderMusicList();
+function openSearchDialog() {
+    dialogOpen($('#search-music-dialog'));
+    // 弹窗打开后再设值，否则 MWC 在无尺寸时计算 label 动画会 NaN
+    setTimeout(() => {
+        const searchInput = $('#music-search');
+        if (searchInput) searchInput.value = state.musicSearchQuery || '';
+        searchInput?.focus();
+    }, 100);
+}
+
+function handleSearchSubmit() {
+    const q = $('#music-search')?.value?.trim() || '';
+    state.musicSearchQuery = q;
+    dialogClose($('#search-music-dialog'));
+    loadMusic();
+}
+
+function handleSearchClear() {
+    $('#music-search').value = '';
+    state.musicSearchQuery = '';
+    dialogClose($('#search-music-dialog'));
+    loadMusic();
 }
 
 /**
@@ -1316,7 +1356,7 @@ function renderMusicList() {
         if (item.bg_url) params.set('bg', item.bg_url);
         if (item.lrc_pos && item.lrc_pos !== 'center') params.set('lrc_pos', item.lrc_pos);
         if (item.lrc_color && item.lrc_color !== 'light') params.set('lrc_color', item.lrc_color);
-        const musicUrl = '/crmusic.php?' + params.toString();
+        const musicUrl = '/crmusic.html?' + params.toString();
         const isOwner = state.user && String(item.user_id) === String(state.user.id);
 
         return `
@@ -2350,6 +2390,13 @@ async function init() {
             e.preventDefault();
             handleAddMusic();
         }
+    });
+    // 搜索音乐对话框事件
+    $('#search-music-submit')?.addEventListener('click', handleSearchSubmit);
+    $('#search-music-cancel')?.addEventListener('click', () => dialogClose($('#search-music-dialog')));
+    $('#search-music-clear')?.addEventListener('click', handleSearchClear);
+    $('#music-search')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleSearchSubmit();
     });
 
     console.log('CRMoment Web App 已启动');

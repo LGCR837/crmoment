@@ -13,23 +13,44 @@ function handleMusicList(): void {
     $page = max(1, (int)getParam('page', 1));
     $size = max(1, min(50, (int)getParam('size', PAGE_SIZE)));
     $offset = ($page - 1) * $size;
+    $q     = trim(getParam('q', ''));
 
     $pdo = getDB();
 
-    // 获取总数
-    $stmt = $pdo->query('SELECT COUNT(*) AS cnt FROM music');
-    $total = (int)$stmt->fetch()['cnt'];
+    if ($q !== '') {
+        $like = '%' . $q . '%';
+        // 获取总数
+        $stmt = $pdo->prepare('SELECT COUNT(*) AS cnt FROM music WHERE title LIKE ?');
+        $stmt->execute([$like]);
+        $total = (int)$stmt->fetch()['cnt'];
 
-    // 获取列表（含作者信息）
-    $stmt = $pdo->prepare(
-        'SELECT m.id, m.title, m.music_url, m.lrc_url, m.bg_url, m.lrc_pos, m.lrc_color, m.plays_count, m.created_at,
-                u.id AS user_id, u.username, u.nickname, u.avatar
-         FROM music m
-         JOIN users u ON m.user_id = u.id
-         ORDER BY m.created_at DESC
-         LIMIT ? OFFSET ?'
-    );
-    $stmt->execute([$size, $offset]);
+        // 获取列表（含作者信息）
+        $stmt = $pdo->prepare(
+            'SELECT m.id, m.title, m.music_url, m.lrc_url, m.bg_url, m.lrc_pos, m.lrc_color, m.plays_count, m.created_at,
+                    u.id AS user_id, u.username, u.nickname, u.avatar
+             FROM music m
+             JOIN users u ON m.user_id = u.id
+             WHERE m.title LIKE ?
+             ORDER BY m.created_at DESC
+             LIMIT ? OFFSET ?'
+        );
+        $stmt->execute([$like, $size, $offset]);
+    } else {
+        // 获取总数
+        $stmt = $pdo->query('SELECT COUNT(*) AS cnt FROM music');
+        $total = (int)$stmt->fetch()['cnt'];
+
+        // 获取列表（含作者信息）
+        $stmt = $pdo->prepare(
+            'SELECT m.id, m.title, m.music_url, m.lrc_url, m.bg_url, m.lrc_pos, m.lrc_color, m.plays_count, m.created_at,
+                    u.id AS user_id, u.username, u.nickname, u.avatar
+             FROM music m
+             JOIN users u ON m.user_id = u.id
+             ORDER BY m.created_at DESC
+             LIMIT ? OFFSET ?'
+        );
+        $stmt->execute([$size, $offset]);
+    }
     $list = $stmt->fetchAll();
 
     // 格式化

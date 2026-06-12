@@ -210,9 +210,12 @@ function handlePostsDelete(int $id): void {
         error('无权删除此动态', 403);
     }
 
-    // 24 小时撤回时限
-    $createdAt = strtotime($post['created_at'] . ' UTC');
-    if (!$createdAt || time() - $createdAt > 86400) {
+    // 用数据库时间判断 24 小时撤回时限（避免 PHP/MySQL 时区不一致）
+    $pdo = getDB();
+    $stmt = $pdo->prepare("SELECT TIMESTAMPDIFF(SECOND, created_at, NOW()) AS seconds_ago FROM posts WHERE id = ?");
+    $stmt->execute([$id]);
+    $row = $stmt->fetch();
+    if (!$row || (int)$row['seconds_ago'] > 86400) {
         error('已超过 24 小时，无法撤回', 403);
     }
 
