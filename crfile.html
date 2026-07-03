@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRFile</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;background:linear-gradient(135deg,#f5f0ff 0%,#fef7ff 50%,#f3e8fd 100%);color:#1d1b20;min-height:100vh;display:flex;align-items:center;justify-content:center;line-height:1.5}
+        .landing{text-align:center;padding:48px 32px}
+        h1{font-size:26px;font-weight:700;background:linear-gradient(135deg,#6750a4,#9c27b0);background-clip:text;-webkit-background-clip:text;color:transparent;margin-bottom:24px}
+        .file-info{margin-bottom:24px}
+        .file-name{font-size:20px;font-weight:600;color:#1d1b20;margin-bottom:4px}
+        .file-size{font-size:15px;color:#49454f}
+        .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 32px;border-radius:28px;background:#6750a4;color:#fff;text-decoration:none;font-weight:600;font-size:15px;box-shadow:0 2px 8px rgba(103,80,164,0.3);transition:transform 0.2s,box-shadow 0.2s;border:none;cursor:pointer}
+        .btn:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(103,80,164,0.4)}
+        .btn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+        .footer{margin-top:40px;color:#79747e;font-size:13px}
+        .error{color:#b3261e;font-size:14px;margin-top:12px}
+        @media(max-width:640px){.landing{padding:32px 20px}h1{font-size:22px}}
+    </style>
+</head>
+<body>
+    <div class="landing">
+        <h1>CRFile 文件分享</h1>
+        <div class="file-info">
+            <p class="file-name" id="fileName">加载中...</p>
+            <p class="file-size" id="fileSize">大小：--</p>
+        </div>
+        <a href="#" class="btn" id="downloadBtn" disabled>下载</a>
+        <p class="error" id="errorMsg"></p>
+        <p class="footer">CRFile · Powered by LGCR837</p>
+    </div>
+
+    <script>
+        (function() {
+            const params = new URLSearchParams(window.location.search);
+            const lanzouUrl = params.get('url');
+            const pwd = params.get('pwd') || '';
+
+            const fileNameEl = document.getElementById('fileName');
+            const fileSizeEl = document.getElementById('fileSize');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const errorMsgEl = document.getElementById('errorMsg');
+
+            // 错误处理：切换到备用链接模式
+            function setFallbackMode() {
+                fileNameEl.textContent = '获取失败，请使用备用链接';
+                fileSizeEl.textContent = '大小：--';
+                downloadBtn.textContent = '备用链接';
+                downloadBtn.disabled = false;
+                downloadBtn.href = '#';
+                downloadBtn.onclick = function(e) {
+                    e.preventDefault();
+                    const msg = pwd ? '提取码：' + pwd : '无提取码';
+                    alert('跳转至蓝奏云原始链接\n' + msg);
+                    window.location.href = lanzouUrl;
+                };
+                errorMsgEl.textContent = 'API 请求失败，已切换到备用链接';
+            }
+
+            // 参数不全
+            if (!lanzouUrl) {
+                fileNameEl.textContent = '参数出错';
+                fileSizeEl.textContent = '大小：--';
+                downloadBtn.disabled = true;
+                errorMsgEl.textContent = '参数出错';
+                return;
+            }
+
+            // 正确 API
+            const apiUrl = 'https://www.tmini.net/api/lanzou';
+            const requestUrl = apiUrl + '?url=' + encodeURIComponent(lanzouUrl) + '&pwd=' + encodeURIComponent(pwd);
+
+            fetch(requestUrl)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 200) {
+                        fileNameEl.textContent = data.name || '未知文件';
+                        fileSizeEl.textContent = '大小：' + (data.filesize || '--');
+                        downloadBtn.textContent = '下载';
+                        downloadBtn.disabled = false;
+                        downloadBtn.href = data.downUrl || '#';
+                        downloadBtn.onclick = null; // 恢复默认行为
+                        errorMsgEl.textContent = '';
+                    } else {
+                        // API 返回错误码
+                        errorMsgEl.textContent = '错误：' + (data.msg || '未知错误');
+                        setFallbackMode();
+                    }
+                })
+                .catch(err => {
+                    errorMsgEl.textContent = '网络错误，已切换备用';
+                    console.error(err);
+                    setFallbackMode();
+                });
+        })();
+    </script>
+</body>
+</html>

@@ -1,4 +1,10 @@
 <!DOCTYPE html>
+<!--
+ * CRMusic
+ * 一个简洁轻量的单文件 HTML 音乐播放器
+ * Powered by LGCR837
+ * MIT LICENSE
+-->
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -9,7 +15,7 @@
 
         body {
             --bg-color: #000000;
-            --text-color: #f5f5f5;
+            --text-color: #e8f0ff;
             width: 100%;
             height: 100vh;
             display: flex;
@@ -19,7 +25,7 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
             position: relative;
         }
 
@@ -28,6 +34,18 @@
             background-position: center center;
             background-attachment: fixed;
             background-repeat: no-repeat;
+        }
+
+        .video-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -1;
+            pointer-events: none;
+            user-select: none;
         }
 
         /* 深色歌词 */
@@ -42,7 +60,7 @@
         div.container {
             width: 100%;
             height: 100vh;
-            overflow: hidden;
+            overflow-y: auto;
             padding-bottom: 100px;
             box-sizing: border-box;
         }
@@ -65,19 +83,10 @@
         .container-center { text-align: center; }
         .container-right { text-align: right; padding-right: 5%; }
         .container-right li { text-align: right; }
-        @media (max-width: 767px) {
-            .container-left, .container-right {
-                text-align: center;
-                padding: 0;
-            }
-            .container-left li, .container-right li {
-                text-align: center;
-            }
-        }
 
         .container ul {
-            transition: transform 0.3s ease-out;
-            will-change: transform;
+            padding-top: calc(50vh - 50px);
+            padding-bottom: calc(50vh - 50px);
         }
 
         audio {
@@ -89,7 +98,7 @@
             transition: opacity 0.2s ease;
         }
 
-        /* WebKit 音频控件：透明背景 + 颜色跟随歌词 */
+        /* WebKit 音频控件美化 */
         :root {
             --audio-filter: brightness(0) invert(1);
         }
@@ -118,16 +127,17 @@
             transition: font-size 0.4s ease, text-shadow 0.4s ease;
             list-style: none;
             font-weight: 500;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
             white-space: normal;
             word-break: break-word;
             max-width: 90vw;
             margin: 0 auto;
+            cursor: pointer;
         }
 
         li.active {
             font-size: 1.35em;
-            text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+            text-shadow: 0 0 14px rgba(232, 240, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.25);
             font-weight: 700;
         }
 
@@ -135,57 +145,78 @@
     </style>
 </head>
 <body>
+    <video class="video-bg" id="videoBg" muted loop autoplay playsinline style="display:none;"></video>
     <div class="container"><ul></ul></div>
     <div class="audio-wrapper">
         <audio controls autoplay loop></audio>
     </div>
 
     <script>
-        // ===== 从 URL 获取参数 =====
+        // 传参
         const params = new URLSearchParams(window.location.search);
         const MUSIC_ID  = parseInt(params.get('id')) || 0;
         const MUSIC_URL = params.get('music') || '';
         const LRC_URL   = params.get('lrc') || '';
         const BG_URL    = params.get('bg') || '';
-        let lrc_pos   = params.get('lrc_pos') || 'center';
-        let lrc_color = params.get('lrc_color') || 'light';
-        if (!['left', 'center', 'right'].includes(lrc_pos)) lrc_pos = 'center';
-        if (!['light', 'dark'].includes(lrc_color)) lrc_color = 'light';
+        const VIDEO_URL = params.get('video') || '';
+        let pos   = params.get('pos') || 'center';
+        let color = params.get('color') || 'light';
+        if (!['left', 'center', 'right', 'none'].includes(pos)) pos = 'center';
+        if (!['light', 'dark'].includes(color)) color = 'light';
 
-        // 必填参数校验
+        // 校验
         if (!MUSIC_URL || !LRC_URL) {
             document.body.innerHTML = '<div style="color:#f88;text-align:center;padding:40px;font-size:18px;">错误：缺少必要参数。请提供 music 和 lrc 参数。</div>';
             throw new Error('缺少必要参数');
         }
 
-        // 设置背景
+        // 背景
         if (BG_URL) {
             document.body.classList.add('has-bg');
             document.body.style.backgroundImage = `url('${encodeURI(BG_URL)}')`;
         }
 
+        // 视频背景
+        if (VIDEO_URL) {
+            const videoEl = document.getElementById('videoBg');
+            videoEl.src = VIDEO_URL;
+            videoEl.style.display = 'block';
+            videoEl.play().catch(function() {});
+        }
+
         // 歌词颜色
-        if (lrc_color === 'dark') document.body.classList.add('dark-lrc');
+        if (color === 'dark') document.body.classList.add('dark-lrc');
 
         // 歌词位置
-        document.querySelector('.container').classList.add('container-' + lrc_pos);
+        if (pos === 'none') {
+            document.querySelector('.container').style.display = 'none';
+        } else {
+            document.querySelector('.container').classList.add('container-' + pos);
+        }
 
         // 音频源
         document.querySelector('audio').src = MUSIC_URL;
 
+        // 元素引用
         const doms = {
             ul: document.querySelector("ul"),
             audio: document.querySelector("audio"),
             container: document.querySelector(".container"),
             wrapper: document.querySelector(".audio-wrapper")
         };
-        let lrcObj = null, liHeight = 0, containerHeight = 0;
+        let lrcObj = null;
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+        let isManualScroll = false, wasManualScroll = false;
+        let lastIndex = -1;
+        let programmaticUntil = 0;
+        let scrollTimer = null;
+        const SCROLL_RESUME = isMobile ? 5000 : 3000;
 
-        // 强制单曲循环
+        // 单曲循环
         doms.audio.loop = true;
 
-        // 尝试自动播放
-        doms.audio.play().catch(e => console.log("自动播放被阻止:", e));
+        // 自动播放
+        doms.audio.play();
 
         // ===== 播放量统计 =====
         if (MUSIC_ID > 0) {
@@ -195,13 +226,32 @@
             });
         }
 
+        // 防止息屏
+        let wakeLock = null;
+        async function requestWakeLock() {
+            if (!('wakeLock' in navigator)) return;
+            try {
+                if (wakeLock) await wakeLock.release();
+                wakeLock = await navigator.wakeLock.request('screen');
+                wakeLock.addEventListener('release', () => { wakeLock = null; });
+            } catch (e) { wakeLock = null; }
+        }
+        function releaseWakeLock() {
+            if (wakeLock) { wakeLock.release(); wakeLock = null; }
+        }
+        doms.audio.addEventListener('play', requestWakeLock);
+        doms.audio.addEventListener('pause', releaseWakeLock);
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible' && !doms.audio.paused) requestWakeLock();
+        });
+
+        // 解析歌词
         function parseLRC(lrc) {
             let result = [];
             lrc.split("\n").forEach(line => {
                 let arr = line.split("]");
                 if (!arr[1]) return;
                 let timeParts = arr[0].substring(1).split(":");
-                // 支持 [mm:ss.xx], [hh:mm:ss.xx], [mm:ss.xxx] 等格式
                 let time = 0;
                 if (timeParts.length === 3) {
                     time = +timeParts[0] * 3600 + +timeParts[1] * 60 + +timeParts[2];
@@ -213,16 +263,19 @@
             return result;
         }
 
+        // 创建元素
         function createElement(obj) {
             let frag = document.createDocumentFragment();
             obj.forEach(item => {
                 let li = document.createElement("li");
                 li.textContent = item.text;
+                li.dataset.time = item.time;
                 frag.appendChild(li);
             });
             doms.ul.appendChild(frag);
         }
 
+        // 查找索引
         function findIndex(lrcObj) {
             let adjustedTime = doms.audio.currentTime + 0.1;
             if (adjustedTime < lrcObj[0].time) return 0;
@@ -233,22 +286,119 @@
             return 0;
         }
 
-        function setOffset() {
+        let scrollAnim = null;
+
+        // 平滑滚动
+        function smoothScrollTo(targetTop, duration) {
+            if (scrollAnim) cancelAnimationFrame(scrollAnim);
+            let startTop = doms.container.scrollTop;
+            let dist = targetTop - startTop;
+            if (Math.abs(dist) < 1) { doms.container.scrollTop = targetTop; return; }
+            let startTime = null;
+            programmaticUntil = Date.now() + duration + 50;
+            function step(ts) {
+                if (!startTime) startTime = ts;
+                let progress = Math.min((ts - startTime) / duration, 1);
+                let ease = 1 - Math.pow(1 - progress, 3);
+                doms.container.scrollTop = startTop + dist * ease;
+                if (progress < 1) scrollAnim = requestAnimationFrame(step);
+                else scrollAnim = null;
+            }
+            scrollAnim = requestAnimationFrame(step);
+        }
+
+        // 自动滚动
+        function autoScroll() {
             if (!lrcObj) return;
             let index = findIndex(lrcObj);
             index = Math.max(0, Math.min(index, lrcObj.length - 1));
-            let offset = containerHeight / 2 - (index + 0.5) * liHeight;
-            doms.ul.style.transform = `translateY(${offset}px)`;
             let active = document.querySelector(".active");
             if (active) active.classList.remove("active");
-            let currentLi = doms.ul.children[index];
-            if (currentLi) currentLi.classList.add("active");
+            let li = doms.ul.children[index];
+            if (li) li.classList.add("active");
+            if (!isManualScroll && li && index !== lastIndex) {
+                let half = doms.container.clientHeight / 2;
+                let target = li.offsetTop + li.offsetHeight / 2 - half;
+                smoothScrollTo(target, 600);
+                wasManualScroll = false;
+            }
+            lastIndex = index;
         }
 
+        // 点击事件
+        doms.ul.addEventListener('click', function(e) {
+            let li = e.target.closest('li');
+            if (!li || li.dataset.time === undefined) return;
+            doms.audio.currentTime = parseFloat(li.dataset.time);
+            isManualScroll = false;
+            clearTimeout(scrollTimer);
+        });
+
+        // 手动滚动事件
+        function enterManualMode() {
+            isManualScroll = true;
+            wasManualScroll = false;
+            clearTimeout(scrollTimer);
+            scrollTimer = setTimeout(function() {
+                isManualScroll = false;
+                wasManualScroll = true;
+                autoScroll();
+            }, SCROLL_RESUME);
+        }
+
+        // 滚动事件
+        if (!isMobile) {
+            doms.container.addEventListener('wheel', enterManualMode, { passive: true });
+        } else {
+            doms.container.addEventListener('touchmove', enterManualMode, { passive: true });
+        }
+
+        // 键盘事件
+        document.addEventListener('keydown', function(e) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (doms.audio.paused) doms.audio.play().catch(function() {}); else doms.audio.pause();
+            } else if (e.code === 'ArrowUp') {
+                e.preventDefault();
+                doms.audio.volume = Math.min(1, Math.round((doms.audio.volume + 0.1) * 10) / 10);
+            } else if (e.code === 'ArrowDown') {
+                e.preventDefault();
+                doms.audio.volume = Math.max(0, Math.round((doms.audio.volume - 0.1) * 10) / 10);
+            } else if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+                e.preventDefault();
+                if (!lrcObj || lrcObj.length === 0) return;
+                let cur = doms.audio.currentTime;
+                let idx = findIndex(lrcObj);
+                idx = Math.max(0, Math.min(idx, lrcObj.length - 1));
+                let target;
+                if (e.code === 'ArrowLeft') {
+                    if (idx === 0) {
+                        target = 0;
+                        if (cur - target > 10) target = cur - 10;
+                    } else {
+                        target = lrcObj[idx - 1].time;
+                        if (cur - target > 10) target = cur - 10;
+                    }
+                } else {
+                    if (idx === lrcObj.length - 1) {
+                        target = doms.audio.duration || cur + 10;
+                        if (target - cur > 10) target = cur + 10;
+                    } else {
+                        target = lrcObj[idx + 1].time;
+                        if (target - cur > 10) target = cur + 10;
+                    }
+                }
+                doms.audio.currentTime = Math.max(0, target);
+                isManualScroll = false;
+                clearTimeout(scrollTimer);
+            }
+        });
+
+        // 自动隐藏
         function initAutoHide() {
             const audio = doms.audio;
             const wrapper = doms.wrapper;
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
             if (!isMobile) {
                 audio.classList.remove('audio-hidden');
                 wrapper.addEventListener('mouseenter', () => audio.classList.remove('audio-hidden'));
@@ -267,6 +417,7 @@
             }
         }
 
+        // 加载歌词
         async function loadLRC() {
             try {
                 const resp = await fetch(LRC_URL);
@@ -275,17 +426,15 @@
                 lrcObj = parseLRC(lrcText);
                 createElement(lrcObj);
                 if (lrcObj[0]?.text.trim()) document.title = lrcObj[0].text.trim();
-                containerHeight = doms.container.clientHeight;
-                liHeight = doms.ul.children[0].clientHeight;
-                setOffset();
-                doms.audio.addEventListener("timeupdate", setOffset);
+                autoScroll();
+                doms.audio.addEventListener("timeupdate", autoScroll);
                 initAutoHide();
             } catch (error) {
-                console.error("加载歌词失败:", error);
-                doms.ul.innerHTML = '<li style="color:#ff8888;">歌词加载失败，请检查网络或稍后重试。</li>';
+                doms.ul.innerHTML = '<li style="color:#ff8888;">歌词加载失败</li>';
             }
         }
 
+        // 页面加载完成事件
         window.addEventListener('DOMContentLoaded', loadLRC);
     </script>
 </body>

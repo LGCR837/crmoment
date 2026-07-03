@@ -1,99 +1,42 @@
-// ===== CRMoment Web App - Material Web Components SPA =====
-
-// ---- MWC 组件导入 ----
-// 参考 deepseek 示范文件：import all.js + typography 样式
-import '@material/web/all.js';
-import {styles as typescaleStyles} from '@material/web/typography/md-typescale-styles.js';
-document.adoptedStyleSheets.push(typescaleStyles.styleSheet);
-
-// ===== 按钮间距修复：MWC 对中文按钮 padding 太窄，直接注入 shadow DOM =====
-function fixButtonPadding() {
-    const selectors = ['md-text-button', 'md-filled-button', 'md-outlined-button', 'md-filled-tonal-button'];
-    for (const sel of selectors) {
-        for (const btn of document.querySelectorAll(sel)) {
-            if (btn.shadowRoot && !btn.dataset.padFixed) {
-                btn.dataset.padFixed = '1';
-                const style = document.createElement('style');
-                // 有图标的按钮：leading 16px, trailing 24px
-                // 无图标的按钮：leading/trailing 各 24px
-                style.textContent = `
-                    :host([has-icon]:not([trailing-icon])) {
-                        padding-inline-start: 16px !important;
-                        padding-inline-end: 24px !important;
-                    }
-                    :host(:not([has-icon])) {
-                        padding-inline-start: 24px !important;
-                        padding-inline-end: 24px !important;
-                    }
-                `;
-                btn.shadowRoot.appendChild(style);
-            }
-        }
-    }
-}
-
-/** 监听 DOM 变化，自动修复新按钮的 padding */
-function setupPadObserver() {
-    const observer = new MutationObserver(() => fixButtonPadding());
-    observer.observe(document.body, { childList: true, subtree: true });
-    fixButtonPadding();
-}
-
-// ===== 音乐广场 =====
-
-/**
- * 加载音乐列表（使用 state.musicSearchQuery 作为关键词）
- */
-async function loadMusic() {
-    const listEl = $('#music-list');
-    if (listEl) listEl.classList.add('music-loading');
-    try {
-        const q = state.musicSearchQuery || '';
-        const url = q ? '/music?page=1&size=50&q=' + encodeURIComponent(q) : '/music?page=1&size=50';
-        const data = await api('GET', url);
-        state.music = data.list || [];
-    } catch (_) {
-        state.music = [];
-    }
-    if (listEl) listEl.classList.remove('music-loading');
-    renderMusicList();
-}
+// ===== CRMoment Web App - Blue Archive Theme =====
 
 const API_BASE = '/api.php?route=';
 
-// ===== 状态管理 =====
+// ===== State Management =====
 const state = {
-    user: null,               // 当前登录用户
-    posts: [],                // 当前动态列表
-    page: 1,                  // 当前页码
+    user: null,
+    posts: [],
+    page: 1,
     hasMore: true,
     loading: false,
-    currentPage: 'home',      // home / messages / profile / explore / user / chat
+    currentPage: 'home',
     viewUserId: null,
-    music: [],                // 音乐广场列表
-    musicSearchQuery: '',     // 音乐搜索关键词
-    editingMusicId: null,     // 正在编辑的音乐 ID（null 表示添加模式）
-    commentPostId: null,      // 正在查看评论的动态 ID
-    selectedImages: [],       // 待上传图片
-    conversations: [],        // 会话列表
-    currentConvId: null,      // 当前打开的会话 ID
-    conversationMessages: {}, // { convId: [messages...] }
-    pollingTimers: {},        // { convId: timerHandle }
+    music: [],
+    musicSearchQuery: '',
+    editingMusicId: null,
+    commentPostId: null,
+    selectedImages: [],
+    conversations: [],
+    currentConvId: null,
+    currentConvType: 'private',
+    conversationMessages: {},
+    pollingTimers: {},
 };
 
-// ===== DOM 引用 =====
+// ===== DOM References =====
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
 const dom = {
     main: $('#main-content'),
-    authDialog: $('#auth-dialog'),
+    authOverlay: $('#auth-overlay'),
     authTitle: $('#auth-title'),
-    authForm: $('#auth-form'),
     authUsername: $('#auth-username'),
     authNickname: $('#auth-nickname'),
+    authNicknameGroup: $('#auth-nickname-group'),
     authPassword: $('#auth-password'),
     authPasswordConfirm: $('#auth-password-confirm'),
+    authPasswordConfirmGroup: $('#auth-password-confirm-group'),
     authError: $('#auth-error'),
     authSubmit: $('#auth-submit'),
     authCancel: $('#auth-cancel'),
@@ -106,12 +49,11 @@ const dom = {
     userAvatarImg: $('#user-avatar-img'),
     btnNotifications: $('#btn-notifications'),
     notifBadge: $('#notif-badge'),
-    btnThemeToggle: $('#btn-theme-toggle'),
-    notifDialog: $('#notif-dialog'),
+    notifOverlay: $('#notif-overlay'),
     notifList: $('#notif-list'),
     notifReadAll: $('#notif-read-all'),
     notifClose: $('#notif-close'),
-    composerDialog: $('#composer-dialog'),
+    composerOverlay: $('#composer-overlay'),
     composerContent: $('#composer-content'),
     composerSubmit: $('#composer-submit'),
     composerCancel: $('#composer-cancel'),
@@ -119,18 +61,13 @@ const dom = {
     composerImagesInput: $('#composer-images-input'),
     imagePreview: $('#image-preview'),
     imageCount: $('#image-count'),
-    commentDialog: $('#comment-dialog'),
+    commentOverlay: $('#comment-overlay'),
     commentTitle: $('#comment-title'),
     commentList: $('#comment-list'),
     commentInput: $('#comment-input'),
     commentSubmit: $('#comment-submit'),
     commentCancel: $('#comment-cancel'),
-    imageViewerDialog: $('#image-viewer-dialog'),
-    imageViewerImg: $('#image-viewer-img'),
-    imageViewerClose: $('#image-viewer-close'),
-    imageViewerCopy: $('#image-viewer-copy'),
-    imageViewerOpen: $('#image-viewer-open'),
-    createGroupDialog: $('#create-group-dialog'),
+    createGroupOverlay: $('#create-group-overlay'),
     groupNameInput: $('#group-name-input'),
     groupMemberList: $('#group-member-list'),
     groupMemberError: $('#group-member-error'),
@@ -138,49 +75,36 @@ const dom = {
     createGroupCancel: $('#create-group-cancel'),
     msgBadge: $('#msg-badge'),
     navMessages: $('#nav-messages'),
-    addMusicDialog: $('#add-music-dialog'),
+    addMusicOverlay: $('#add-music-overlay'),
     musicTitle: $('#music-title'),
     musicUrl: $('#music-url'),
     musicLrcUrl: $('#music-lrc-url'),
     musicBgUrl: $('#music-bg-url'),
+    musicVideoUrl: $('#music-video-url'),
     addMusicError: $('#add-music-error'),
     addMusicSubmit: $('#add-music-submit'),
     addMusicCancel: $('#add-music-cancel'),
 };
 
-// ===== API 请求 =====
+// ===== API Request =====
 async function api(method, path, body = null) {
-    const opts = {
-        method,
-        headers: {},
-    };
-
-    // 从 localStorage 读取 Token
+    const opts = { method, headers: {} };
     const token = localStorage.getItem('crmoment-token');
 
     if (body instanceof FormData) {
-        // FormData 方式：把 token 作为字段追加进去
-        if (token) {
-            body.append('token', token);
-        }
+        if (token) body.append('token', token);
         opts.body = body;
     } else if (body !== null) {
-        // JSON 方式：把 token 合并到 body 中
-        if (token) {
-            body.token = token;
-        }
+        if (token) body.token = token;
         opts.headers['Content-Type'] = 'application/json';
         opts.body = JSON.stringify(body);
     } else {
-        // GET/DELETE 等无 body 的请求：把 token 拼到 URL 查询参数上
         if (token) {
             const sep = path.indexOf('?') === -1 ? '?' : '&';
             path = path + sep + 'token=' + encodeURIComponent(token);
         }
     }
 
-    // 将 path 中的查询参数（?key=val）拆出来，附加到 API_BASE 末尾作为独立参数
-    // 避免 ?route=/posts?page=1 这类错误的 URL
     let url = API_BASE;
     const qIdx = path.indexOf('?');
     if (qIdx !== -1) {
@@ -191,18 +115,14 @@ async function api(method, path, body = null) {
 
     const res = await fetch(url, opts);
     const data = await res.json();
-
-    if (data.code !== 0) {
-        throw new Error(data.message || '请求失败');
-    }
+    if (data.code !== 0) throw new Error(data.message || '请求失败');
     return data.data;
 }
 
-// ===== Toast 提示 =====
+// ===== Toast =====
 function showToast(msg) {
     const old = document.querySelector('.error-toast');
     if (old) old.remove();
-
     const el = document.createElement('div');
     el.className = 'error-toast';
     el.textContent = msg;
@@ -210,66 +130,92 @@ function showToast(msg) {
     setTimeout(() => el.remove(), 3000);
 }
 
-// ===== MWC 对话框辅助 =====
-let dialogCount = 0;
-/** 所有已注册 close 事件监听的 dialog 集合，避免重复绑定 */
-const dialogCloseListeners = new WeakSet();
-
-function dialogOpen(el) {
-    if (el && typeof el.show === 'function') {
-        el.show();
-        dialogCount++;
+// ===== Modal Helpers =====
+function getOpenOverlay() {
+    return document.querySelector('.modal-overlay.open');
+}
+function dialogOpen(overlayEl) {
+    if (overlayEl) {
+        overlayEl.classList.add('open');
         document.body.classList.add('dialog-open');
-        // 监听原生 close 事件（Escape 键关闭时会触发），确保 body class 被清理
-        if (!dialogCloseListeners.has(el)) {
-            el.addEventListener('close', () => {
-                // MWC dialog 的 close 事件在 shadow DOM 内部 dialog 关闭时触发
-                dialogCount--;
-                if (dialogCount <= 0) {
-                    dialogCount = 0;
-                    document.body.classList.remove('dialog-open');
-                }
-            });
-            dialogCloseListeners.add(el);
-        }
-        // 修正：MWC md-dialog 内部 <dialog> 使用 margin:inherit，
-        // 但 :host 的 display:contents 使继承链断裂(<dialog> 从 <body> 继承 margin:0)，
-        // 导致对话框出现在左上角。此处强制设置 margin:auto。
-        requestAnimationFrame(() => {
-            const dlg = el.shadowRoot?.querySelector('dialog');
-            if (dlg) {
-                dlg.style.margin = 'auto';
-                dlg.style.maxWidth = '560px';
-            }
-        });
+        history.pushState({ dialog: true }, '');
     }
 }
-function dialogClose(el) {
-    if (el && typeof el.close === 'function') {
-        el.close();
-        dialogCount--;
-        if (dialogCount <= 0) {
-            dialogCount = 0;
-            document.body.classList.remove('dialog-open');
-        }
+function dialogClose(overlayEl) {
+    if (overlayEl) {
+        overlayEl.classList.remove('open');
+        document.body.classList.remove('dialog-open');
     }
 }
 
-// ===== 认证 =====
+// Close modal on backdrop click
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal-overlay') && e.target.classList.contains('open')) {
+        dialogClose(e.target);
+    }
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const overlay = getOpenOverlay();
+        if (overlay) dialogClose(overlay);
+    }
+});
+
+// Close modal on phone back button
+window.addEventListener('popstate', () => {
+    const overlay = getOpenOverlay();
+    if (overlay) dialogClose(overlay);
+});
+
+// ===== Icon Helper =====
+function icon(name) {
+    return `<span class="material-symbols-outlined">${name}</span>`;
+}
+
+// ===== Avatar Helper =====
+const AVATAR_CDN_PRIMARY = 'https://root.crmoment.ccwu.cc';
+const AVATAR_CDN_FALLBACK = 'https://crmoment.ccwu.cc';
+const AVATAR_FALLBACK_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='20' fill='%23e0e0e0'/%3E%3C/svg%3E";
+
+function avatarSrc(path) {
+    if (!path) return '/uploads/avatars/default.svg';
+    if (path.startsWith('http')) return path;
+    return AVATAR_CDN_PRIMARY + path;
+}
+
+function avatarOnerror(name) {
+    const initial = (name || '?')[0];
+    const fallbackSvg = 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#e0e0e0"/><text x="20" y="26" text-anchor="middle" font-size="18" fill="#999">${initial}</text></svg>`);
+    return `var s=this.src;if(s.indexOf('${AVATAR_CDN_PRIMARY}')!==-1){this.src=s.replace('${AVATAR_CDN_PRIMARY}','${AVATAR_CDN_FALLBACK}')}else{this.onerror=null;this.src='${fallbackSvg}'}`;
+}
+
+function retryArea(msg, retryFn) {
+    if (!retryArea._counter) retryArea._counter = 0;
+    const id = '_retry_' + (++retryArea._counter);
+    setTimeout(() => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('click', (e) => { e.stopPropagation(); retryFn(); });
+    }, 0);
+    return `<div class="retry-area">${escapeHtml(msg)}<br><button class="btn-primary retry-btn" id="${id}">${icon('refresh')} 重试</button></div>`;
+}
+
+// ===== Auth =====
 let authMode = 'login';
 
 function switchAuthMode(mode) {
     authMode = mode;
     dom.authTitle.textContent = mode === 'login' ? '登录' : '注册';
-    dom.authSubmit.label = mode === 'login' ? '登录' : '注册';
+    dom.authSubmit.textContent = mode === 'login' ? '登录' : '注册';
     dom.authTabLogin.classList.toggle('active', mode === 'login');
     dom.authTabRegister.classList.toggle('active', mode === 'register');
     dom.authError.style.display = 'none';
     dom.authPassword.value = '';
     dom.authPasswordConfirm.value = '';
-    dom.authNickname.style.display = mode === 'register' ? '' : 'none';
+    dom.authNicknameGroup.style.display = mode === 'register' ? '' : 'none';
     dom.authNickname.required = mode === 'register';
-    dom.authPasswordConfirm.style.display = mode === 'register' ? '' : 'none';
+    dom.authPasswordConfirmGroup.style.display = mode === 'register' ? '' : 'none';
     dom.authPasswordConfirm.required = mode === 'register';
 }
 
@@ -287,7 +233,6 @@ dom.authSubmit.addEventListener('click', async () => {
         dom.authError.style.display = 'block';
         return;
     }
-
     if (authMode === 'register') {
         if (password !== confirmPassword) {
             dom.authError.textContent = '两次密码输入不一致';
@@ -303,19 +248,12 @@ dom.authSubmit.addEventListener('click', async () => {
 
     try {
         const endpoint = authMode === 'login' ? '/auth/login' : '/auth/register';
-        const body = authMode === 'login'
-            ? { username, password }
-            : { username, nickname, password };
+        const body = authMode === 'login' ? { username, password } : { username, nickname, password };
         const result = await api('POST', endpoint, body);
-
-        // 保存 Token 到 localStorage
-        if (result.token) {
-            localStorage.setItem('crmoment-token', result.token);
-        }
-
+        if (result.token) localStorage.setItem('crmoment-token', result.token);
         state.user = result;
         updateAuthUI();
-        dialogClose(dom.authDialog);
+        dialogClose(dom.authOverlay);
         dom.authError.style.display = 'none';
         dom.authUsername.value = '';
         dom.authPassword.value = '';
@@ -328,7 +266,7 @@ dom.authSubmit.addEventListener('click', async () => {
     }
 });
 
-dom.authCancel.addEventListener('click', () => dialogClose(dom.authDialog));
+dom.authCancel.addEventListener('click', () => dialogClose(dom.authOverlay));
 
 function updateAuthUI() {
     if (state.user) {
@@ -336,16 +274,8 @@ function updateAuthUI() {
         dom.navUser.style.display = 'flex';
         dom.navProfile.style.display = '';
         dom.navMessages.style.display = '';
-        dom.userAvatarImg.src = state.user.avatar || '/uploads/avatars/default.svg';
-        dom.userAvatarImg.onerror = function() {
-            const name = state.user.nickname || state.user.username;
-            this.src = 'data:image/svg+xml,' + encodeURIComponent(
-                `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">
-                    <circle cx="20" cy="20" r="20" fill="#e0e0e0"/>
-                    <text x="20" y="26" text-anchor="middle" font-size="18" fill="#999">${name[0]}</text>
-                </svg>`
-            );
-        };
+        dom.userAvatarImg.src = avatarSrc(state.user.avatar);
+        dom.userAvatarImg.onerror = function() { avatarOnerror.call(this, state.user.nickname || state.user.username); };
     } else {
         dom.navAuth.style.display = 'flex';
         dom.navUser.style.display = 'none';
@@ -354,20 +284,14 @@ function updateAuthUI() {
     }
 }
 
-// 登录按钮
 dom.btnLogin.addEventListener('click', () => {
     switchAuthMode('login');
-    dialogOpen(dom.authDialog);
+    dialogOpen(dom.authOverlay);
 });
 
-// 退出
 async function handleLogout() {
-    try {
-        await api('POST', '/auth/logout');
-    } catch (_) {}
-    // 停止聊天轮询
+    try { await api('POST', '/auth/logout'); } catch (_) {}
     stopAllPolling();
-    // 清除 Token
     localStorage.removeItem('crmoment-token');
     state.user = null;
     updateAuthUI();
@@ -375,45 +299,35 @@ async function handleLogout() {
     renderHome();
 }
 
-// ===== 导航 =====
+// ===== Navigation =====
 $$('.nav-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const page = btn.dataset.page;
-        navigateTo(page);
-    });
+    btn.addEventListener('click', () => navigateTo(btn.dataset.page));
 });
 
-// 点击右上角头像跳转个人主页
 const userAvatarBtn = $('#btn-user-avatar');
 if (userAvatarBtn) {
-    userAvatarBtn.addEventListener('click', () => {
-        navigateTo('profile');
-    });
+    userAvatarBtn.addEventListener('click', () => navigateTo('profile'));
 }
 
-function navigateTo(page) {
+async function navigateTo(page) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     state.currentPage = page;
     $$('.nav-btn').forEach(b => b.classList.remove('active'));
     const activeBtn = document.querySelector(`.nav-btn[data-page="${page}"]`);
     if (activeBtn) activeBtn.classList.add('active');
-
-    // 离开聊天详情时停止轮询
-    if (page !== 'chat') {
-        stopAllPolling();
-    }
-
+    if (page !== 'chat') stopAllPolling();
     switch (page) {
-        case 'home': renderHome(); break;
-        case 'messages': renderConversationList(); break;
-        case 'profile': renderProfile(); break;
-        case 'explore': renderExplore(); break;
+        case 'home': await renderHome(); break;
+        case 'messages': await renderConversationList(); break;
+        case 'profile': await renderProfile(); break;
+        case 'explore': await renderExplore(); break;
         case 'chat':
             if (state.currentConvId) renderConversationDetail(state.currentConvId);
             break;
     }
 }
 
-// ===== 主页渲染 =====
+// ===== Home Page =====
 async function renderHome() {
     state.page = 1;
     state.posts = [];
@@ -422,22 +336,16 @@ async function renderHome() {
     dom.main.innerHTML = `
         ${state.user ? `
         <div class="composer-card" id="composer-trigger">
-            <img src="${state.user.avatar || '/uploads/avatars/default.svg'}" 
-                 class="post-avatar" 
-                 onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#e0e0e0"/><text x="20" y="26" text-anchor="middle" font-size="18" fill="#999">' + state.user.username[0] + '</text></svg>')}'">
+            <img src="${avatarSrc(state.user.avatar)}" class="post-avatar"
+                 onerror="${avatarOnerror(state.user.username)}">
             <div class="composer-placeholder">有什么新鲜事？</div>
-        </div>
-        ` : ''}
+        </div>` : ''}
         <div class="section-title">最新动态</div>
         <div id="post-feed"></div>
         <div id="feed-status"></div>
     `;
 
-    const trigger = $('#composer-trigger');
-    if (trigger) {
-        trigger.addEventListener('click', () => dialogOpen(dom.composerDialog));
-    }
-
+    $('#composer-trigger')?.addEventListener('click', () => dialogOpen(dom.composerOverlay));
     await loadPosts();
 }
 
@@ -445,136 +353,119 @@ async function loadPosts() {
     const feed = $('#post-feed');
     const status = $('#feed-status');
     if (!feed) return;
-
     if (state.loading) return;
     state.loading = true;
 
-    // 显示加载指示
     if (state.page === 1) {
-        status.innerHTML = '<div class="loading-indicator"><md-circular-progress indeterminate></md-circular-progress></div>';
+        status.innerHTML = '<div class="loading-indicator"><div class="spinner"></div></div>';
     } else {
-        status.innerHTML = '<div class="loading-indicator"><md-circular-progress indeterminate></md-circular-progress><div>加载中...</div></div>';
+        status.innerHTML = '<div class="loading-indicator"><div class="spinner"></div><div>加载中...</div></div>';
     }
 
     try {
         const data = await api('GET', `/posts?page=${state.page}&size=10`);
-        state.posts = state.page === 1 ? data.list : [...state.posts, ...data.list];
         state.hasMore = data.has_more;
 
-        renderPosts(feed);
+        if (state.page === 1) {
+            state.posts = data.list;
+            renderPosts(feed);
+        } else {
+            const newPosts = data.list;
+            state.posts = [...state.posts, ...newPosts];
+            const html = newPosts.map(post => renderPostCard(post)).join('\n');
+            feed.insertAdjacentHTML('beforeend', html);
+            feed.querySelectorAll('.post-card:not([data-bound])').forEach(card => {
+                card.dataset.bound = '1';
+                bindPostCardEvents(card);
+            });
+            observeRevealElements();
+        }
 
         if (state.hasMore) {
-            status.innerHTML = '<div class="loading-indicator" id="load-more-btn"><md-text-button>加载更多</md-text-button></div>';
-            const loadMore = $('#load-more-btn');
-            if (loadMore) {
-                loadMore.addEventListener('click', () => {
-                    state.page++;
-                    loadPosts();
-                });
-            }
+            status.innerHTML = '<div class="loading-indicator" id="load-more-btn"><button class="btn-text">加载更多</button></div>';
+            $('#load-more-btn')?.addEventListener('click', () => { state.page++; loadPosts(); });
         } else {
             status.innerHTML = state.posts.length > 0
                 ? '<div class="end-indicator">— 没有更多了 —</div>'
                 : '<div class="end-indicator">暂无动态，快来发布第一条吧！</div>';
         }
     } catch (e) {
-        status.innerHTML = `<div class="end-indicator">加载失败: ${e.message}</div>`;
+        status.innerHTML = retryArea('加载失败: ' + e.message, () => { state.page = 1; state.posts = []; state.hasMore = true; loadPosts(); });
     } finally {
         state.loading = false;
     }
 }
 
-function renderPosts(container) {
-    if (state.posts.length === 0) {
-        container.innerHTML = '';
-        return;
-    }
-
-    container.innerHTML = state.posts.map(post => renderPostCard(post)).join('\n');
-
-    // 绑定事件
-    container.querySelectorAll('.like-btn').forEach(btn => {
+function bindPostCardEvents(card) {
+    card.querySelectorAll('.like-btn').forEach(btn => {
         btn.addEventListener('click', () => handleLike(btn.dataset.postId));
     });
-    container.querySelectorAll('.comment-btn').forEach(btn => {
+    card.querySelectorAll('.comment-btn').forEach(btn => {
         btn.addEventListener('click', () => openComments(btn.dataset.postId));
     });
-    container.querySelectorAll('.share-btn').forEach(btn => {
+    card.querySelectorAll('.share-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            const url = btn.dataset.url;
-            navigator.clipboard.writeText(url).then(() => {
-                showToast('链接已复制到剪贴板');
+            navigator.clipboard.writeText(btn.dataset.url).then(() => {
+                showToast('已复制链接');
             }).catch(() => {
-                // 降级方案
                 const ta = document.createElement('textarea');
-                ta.value = url;
+                ta.value = btn.dataset.url;
                 document.body.appendChild(ta);
                 ta.select();
                 document.execCommand('copy');
                 document.body.removeChild(ta);
-                showToast('链接已复制到剪贴板');
+                showToast('已复制链接');
             });
         });
     });
-    container.querySelectorAll('.recall-btn').forEach(btn => {
+    card.querySelectorAll('.recall-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
-            const postId = btn.dataset.postId;
             if (!confirm('确定撤回这条动态？')) return;
             try {
-                await api('DELETE', `/posts/${postId}`);
+                await api('DELETE', `/posts/${btn.dataset.postId}`);
                 showToast('已撤回');
                 btn.closest('.post-card').remove();
-                const idx = state.posts.findIndex(p => p.id == postId);
+                const idx = state.posts.findIndex(p => p.id == btn.dataset.postId);
                 if (idx !== -1) state.posts.splice(idx, 1);
-            } catch (e) {
-                showToast(e.message);
-            }
+            } catch (e) { showToast(e.message); }
         });
     });
-    container.querySelectorAll('.post-images img').forEach(img => {
-        img.addEventListener('click', () => openImageViewer(img.src));
+    card.querySelectorAll('.post-images img').forEach(img => {
+        bindImageEvents(img);
     });
-    container.querySelectorAll('.post-author, .post-avatar').forEach(el => {
+    card.querySelectorAll('.post-author, .post-avatar').forEach(el => {
         el.addEventListener('click', (e) => {
             e.stopPropagation();
             const userId = el.dataset.userId;
-            if (userId) {
-                navigateToUserProfile(parseInt(userId));
-            }
+            if (userId) navigateToUserProfile(parseInt(userId));
         });
     });
 }
 
-// ===== 跳转到指定动态（支持懒加载） =====
+function renderPosts(container) {
+    if (state.posts.length === 0) { container.innerHTML = ''; return; }
+    container.innerHTML = state.posts.map(post => renderPostCard(post)).join('\n');
+    container.querySelectorAll('.post-card').forEach(card => bindPostCardEvents(card));
+    observeRevealElements();
+}
+
 async function scrollToPost(postId) {
-    // 先检查是否已在 DOM 中
     let target = document.querySelector(`.post-card[data-post-id="${postId}"]`);
     if (!target) {
-        // 尝试从 API 获取单条动态
         try {
             const post = await api('GET', `/posts/${postId}`);
-            // 如果已在列表里则更新，否则插入到最前面
             const idx = state.posts.findIndex(p => p.id == postId);
-            if (idx !== -1) {
-                state.posts[idx] = post;
-            } else {
-                state.posts.unshift(post);
-            }
+            if (idx !== -1) state.posts[idx] = post; else state.posts.unshift(post);
             const feed = $('#post-feed');
             if (feed) renderPosts(feed);
-        } catch (e) {
-            showToast('无法找到该动态');
-            return;
-        }
+        } catch (e) { showToast('无法找到该动态'); return; }
         target = document.querySelector(`.post-card[data-post-id="${postId}"]`);
-        if (!target) {
-            showToast('无法定位到该动态');
-            return;
-        }
+        if (!target) { showToast('无法定位到该动态'); return; }
     }
     target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    target.style.boxShadow = '0 0 0 3px var(--md-sys-color-primary, #6750a4), var(--md-elevation-level2)';
-    setTimeout(() => { target.style.boxShadow = ''; }, 3000);
+    target.style.boxShadow = '0 0 0 3px var(--ba-blue), var(--ba-card-shadow-hover)';
+    target.style.borderColor = 'var(--ba-blue)';
+    setTimeout(() => { target.style.boxShadow = ''; target.style.borderColor = ''; }, 3000);
 }
 
 function renderPostCard(post) {
@@ -584,47 +475,42 @@ function renderPostCard(post) {
     const likedClass = post.is_liked ? 'liked' : '';
     const postUrl = `https://crmoment.ccwu.cc/web#${post.id}`;
 
-    // 判断是否可撤回（自己 & 24 小时内）
     let canRecall = false;
     if (state.user) {
         const isOwner = String(post.user_id) === String(state.user.id);
         if (isOwner) {
             const postTime = new Date(post.created_at?.replace(' ', 'T') + 'Z').getTime();
-            const ageMs = Date.now() - postTime;
-            canRecall = ageMs < 24 * 60 * 60 * 1000;
+            canRecall = (Date.now() - postTime) < 24 * 60 * 60 * 1000;
         }
     }
     const recallHtml = canRecall ? `
-            <button class="action-btn recall-btn" data-post-id="${post.id}">
-                <md-icon>undo</md-icon>
-                <span>撤回</span>
-            </button>` : '';
+        <button class="action-btn recall-btn" data-post-id="${post.id}">
+            ${icon('undo')}<span>撤回</span>
+        </button>` : '';
 
     return `
     <div class="post-card" data-post-id="${post.id}">
         <div class="post-header">
-            <img src="${post.avatar || '/uploads/avatars/default.svg'}" 
-                 class="post-avatar" data-user-id="${post.user_id}"
-                 onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#e0e0e0"/><text x="20" y="26" text-anchor="middle" font-size="18" fill="#999">' + (post.nickname || post.username)[0] + '</text></svg>')}'">
+            <img src="${avatarSrc(post.avatar)}" class="post-avatar" data-user-id="${post.user_id}"
+                 onerror="${avatarOnerror(post.nickname || post.username)}">
             <span class="post-author" data-user-id="${post.user_id}">${escapeHtml(post.nickname || post.username)}</span>
             <span class="post-badge">#${post.id}</span>
             <span class="post-time">${time}</span>
         </div>
-        <div class="post-content">${escapeHtml(post.content)}</div>
+        <div class="post-content">${renderTextWithLinks(post.content)}</div>
         ${imageHtml}
         <div class="post-actions">
             <button class="action-btn like-btn ${likedClass}" data-post-id="${post.id}">
-                <md-icon>${post.is_liked ? 'favorite' : 'favorite_border'}</md-icon>
+                ${icon(post.is_liked ? 'favorite' : 'favorite_border')}
                 <span>${post.likes_count || 0}</span>
             </button>
             <button class="action-btn comment-btn" data-post-id="${post.id}">
-                <md-icon>chat_bubble_outline</md-icon>
-                <span>${post.comments_count || 0}</span>
+                ${icon('chat_bubble_outline')}
+                <span class="comment-count">${post.comments_count || 0}</span>
             </button>
             ${recallHtml}
             <button class="action-btn share-btn" data-url="${postUrl}">
-                <md-icon>share</md-icon>
-                <span>分享</span>
+                ${icon('share')}<span>分享</span>
             </button>
         </div>
     </div>`;
@@ -636,16 +522,11 @@ function renderImages(images) {
     return `<div class="${cls}">${images.map(img => `<img src="${img}" alt="图片" loading="lazy">`).join('\n')}</div>`;
 }
 
-// ===== 点赞 =====
+// ===== Like =====
 async function handleLike(postId) {
-    if (!state.user) {
-        showToast('请先登录');
-        return;
-    }
-
+    if (!state.user) { showToast('请先登录'); return; }
     const post = state.posts.find(p => p.id == postId);
     if (!post) return;
-
     try {
         if (post.is_liked) {
             await api('DELETE', `/posts/${postId}/like`);
@@ -656,34 +537,30 @@ async function handleLike(postId) {
             post.is_liked = true;
             post.likes_count = (post.likes_count || 0) + 1;
         }
-        // 重新渲染当前可见卡片
         const card = document.querySelector(`.post-card[data-post-id="${postId}"]`);
         if (card) {
             const likeBtn = card.querySelector('.like-btn');
             if (likeBtn) {
                 likeBtn.classList.toggle('liked', post.is_liked);
-                likeBtn.querySelector('md-icon').textContent = post.is_liked ? 'favorite' : 'favorite_border';
-                likeBtn.querySelector('span').textContent = post.likes_count;
+                likeBtn.querySelector('.material-symbols-outlined').textContent = post.is_liked ? 'favorite' : 'favorite_border';
+                likeBtn.querySelector('span:last-child').textContent = post.likes_count;
             }
         }
-    } catch (e) {
-        showToast(e.message);
-    }
+    } catch (e) { showToast(e.message); }
 }
 
-// ===== 评论 =====
+// ===== Comments =====
 async function openComments(postId) {
     state.commentPostId = postId;
     dom.commentTitle.textContent = '评论';
-    dom.commentList.innerHTML = '<div class="loading-indicator"><md-circular-progress indeterminate></md-circular-progress></div>';
+    dom.commentList.innerHTML = '<div class="loading-indicator"><div class="spinner"></div></div>';
     dom.commentInput.value = '';
-    dialogOpen(dom.commentDialog);
-
+    dialogOpen(dom.commentOverlay);
     try {
         const data = await api('GET', `/posts/${postId}/comments`);
         renderComments(data.list);
     } catch (e) {
-        dom.commentList.innerHTML = `<div class="comment-empty">加载评论失败: ${e.message}</div>`;
+        dom.commentList.innerHTML = retryArea('加载评论失败: ' + e.message, () => openComments(state.commentPostId || postId));
     }
 }
 
@@ -692,22 +569,21 @@ function renderComments(comments) {
         dom.commentList.innerHTML = '<div class="comment-empty">暂无评论，来写第一条吧</div>';
         return;
     }
-
     dom.commentList.innerHTML = comments.map(c => `
         <div class="comment-item">
-            <img src="${c.avatar || '/uploads/avatars/default.svg'}" class="comment-avatar" data-user-id="${c.user_id}"
-                 onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#e0e0e0"/><text x="16" y="21" text-anchor="middle" font-size="14" fill="#999">' + (c.nickname || c.username)[0] + '</text></svg>')}'">
+            <img src="${avatarSrc(c.avatar)}" class="comment-avatar" data-user-id="${c.user_id}"
+                 onerror="${avatarOnerror(c.nickname || c.username)}">
             <div class="comment-body">
                 <div class="comment-author" data-user-id="${c.user_id}">${escapeHtml(c.nickname || c.username)}</div>
-                <div class="comment-text">${escapeHtml(c.content)}</div>
+                <div class="comment-text">${renderTextWithLinks(c.content)}</div>
                 <div class="comment-time">${formatTime(c.created_at)}</div>
                 ${c.replies && c.replies.length > 0 ? c.replies.map(r => `
                     <div class="comment-item" style="margin-top:8px;padding-left:42px;border:none">
-                        <img src="${r.avatar || '/uploads/avatars/default.svg'}" class="comment-avatar" data-user-id="${r.user_id}"
-                             onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#e0e0e0"/><text x="16" y="21" text-anchor="middle" font-size="14" fill="#999">' + (r.nickname || r.username)[0] + '</text></svg>')}'">
+                        <img src="${avatarSrc(r.avatar)}" class="comment-avatar" data-user-id="${r.user_id}"
+                             onerror="${avatarOnerror(r.nickname || r.username)}">
                         <div class="comment-body" style="margin-left:0">
                             <div class="comment-author" data-user-id="${r.user_id}">${escapeHtml(r.nickname || r.username)}</div>
-                            <div class="comment-text">${escapeHtml(r.content)}</div>
+                            <div class="comment-text">${renderTextWithLinks(r.content)}</div>
                             <div class="comment-time">${formatTime(r.created_at)}</div>
                         </div>
                     </div>
@@ -716,55 +592,40 @@ function renderComments(comments) {
         </div>
     `).join('\n');
 
-    // 点击评论中的头像/用户名跳转到用户主页
     dom.commentList.querySelectorAll('.comment-avatar, .comment-author').forEach(el => {
         el.addEventListener('click', (e) => {
             e.stopPropagation();
             const userId = el.dataset.userId;
-            if (userId) {
-                dialogClose(dom.commentDialog);
-                navigateToUserProfile(parseInt(userId));
-            }
+            if (userId) { dialogClose(dom.commentOverlay); navigateToUserProfile(parseInt(userId)); }
         });
     });
 }
 
 dom.commentSubmit.addEventListener('click', async () => {
-    if (!state.user) {
-        showToast('请先登录');
-        return;
-    }
+    if (!state.user) { showToast('请先登录'); return; }
     const content = dom.commentInput.value.trim();
-    if (!content) {
-        showToast('请输入评论内容');
-        return;
-    }
+    if (!content) { showToast('请输入评论内容'); return; }
     try {
         await api('POST', `/posts/${state.commentPostId}/comments`, { content });
         dom.commentInput.value = '';
         showToast('评论成功');
-        // 刷新评论
         const data = await api('GET', `/posts/${state.commentPostId}/comments`);
         renderComments(data.list);
-
-        // 更新前端评论数
         const post = state.posts.find(p => p.id == state.commentPostId);
         if (post) {
             post.comments_count = (post.comments_count || 0) + 1;
             const card = document.querySelector(`.post-card[data-post-id="${state.commentPostId}"]`);
             if (card) {
-                const countSpan = card.querySelector('.comment-btn span');
+                const countSpan = card.querySelector('.comment-btn .comment-count');
                 if (countSpan) countSpan.textContent = post.comments_count;
             }
         }
-    } catch (e) {
-        showToast(e.message);
-    }
+    } catch (e) { showToast(e.message); }
 });
 
-dom.commentCancel.addEventListener('click', () => dialogClose(dom.commentDialog));
+dom.commentCancel.addEventListener('click', () => dialogClose(dom.commentOverlay));
 
-// ===== 发布动态 =====
+// ===== Post Composer =====
 let selectedFiles = [];
 
 dom.btnAddImage.addEventListener('click', (e) => {
@@ -774,64 +635,52 @@ dom.btnAddImage.addEventListener('click', (e) => {
 
 dom.composerImagesInput.addEventListener('change', () => {
     const remain = 9 - selectedFiles.length;
-    if (remain <= 0) {
-        showToast('最多选择 9 张图片');
-        dom.composerImagesInput.value = '';
-        return;
-    }
+    if (remain <= 0) { showToast('最多选择 9 张图片'); dom.composerImagesInput.value = ''; return; }
     const newFiles = Array.from(dom.composerImagesInput.files).slice(0, remain);
     selectedFiles = [...selectedFiles, ...newFiles];
     dom.imageCount.textContent = selectedFiles.length > 0 ? `${selectedFiles.length} 张图片` : '';
-
-    // 追加新图片预览（可点击删除）
     const startIdx = selectedFiles.length - newFiles.length;
     const newPreviews = newFiles.map((f, i) => {
         const url = URL.createObjectURL(f);
-        return `<div class="preview-item" data-idx="${startIdx + i}">
-            <img src="${url}" alt="">
-            <div class="preview-remove">×</div>
+        return `<div class="preview-item" data-idx="${startIdx + i}" style="position:relative;width:80px;height:80px;cursor:pointer">
+            <img src="${url}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:8px;border:1px solid rgba(150,170,190,0.3)">
+            <div class="preview-remove" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;background:var(--ba-pink);color:#fff;border-radius:50%;font-size:14px;line-height:20px;text-align:center;display:none;box-shadow:0 1px 3px rgba(0,0,0,0.3)">×</div>
         </div>`;
     }).join('\n');
     dom.imagePreview.insertAdjacentHTML('beforeend', newPreviews);
-
-    // 清空 input，允许重复选择同一文件
     dom.composerImagesInput.value = '';
 });
 
-// 点击预览图片删除
 dom.imagePreview.addEventListener('click', (e) => {
     const item = e.target.closest('.preview-item');
     if (!item) return;
     const idx = parseInt(item.dataset.idx);
-    // 从 selectedFiles 中移除
     selectedFiles.splice(idx, 1);
-    // 从 DOM 移除
     item.remove();
-    // 更新后续预览的 data-idx
     const items = dom.imagePreview.querySelectorAll('.preview-item');
     items.forEach((el, i) => el.dataset.idx = i);
-    // 更新图片计数
     dom.imageCount.textContent = selectedFiles.length > 0 ? `${selectedFiles.length} 张图片` : '';
 });
 
-dom.composerSubmit.addEventListener('click', async () => {
-    if (!state.user) {
-        showToast('请先登录');
-        return;
-    }
-    const content = dom.composerContent.value.trim();
-    if (!content) {
-        showToast('请输入内容');
-        return;
-    }
+// Show remove button on hover
+dom.imagePreview.addEventListener('mouseover', (e) => {
+    const item = e.target.closest('.preview-item');
+    if (item) { const rm = item.querySelector('.preview-remove'); if (rm) rm.style.display = 'block'; }
+});
+dom.imagePreview.addEventListener('mouseout', (e) => {
+    const item = e.target.closest('.preview-item');
+    if (item) { const rm = item.querySelector('.preview-remove'); if (rm) rm.style.display = 'none'; }
+});
 
+dom.composerSubmit.addEventListener('click', async () => {
+    if (!state.user) { showToast('请先登录'); return; }
+    const content = dom.composerContent.value.trim();
+    if (!content) { showToast('请输入内容'); return; }
     const formData = new FormData();
     formData.append('content', content);
     selectedFiles.forEach(f => formData.append('images[]', f));
-
-    dom.composerSubmit.label = '发布中...';
+    dom.composerSubmit.textContent = '发布中...';
     dom.composerSubmit.disabled = true;
-
     try {
         await api('POST', '/posts', formData);
         dom.composerContent.value = '';
@@ -839,110 +688,229 @@ dom.composerSubmit.addEventListener('click', async () => {
         dom.composerImagesInput.value = '';
         dom.imagePreview.innerHTML = '';
         dom.imageCount.textContent = '';
-        dialogClose(dom.composerDialog);
+        dialogClose(dom.composerOverlay);
         showToast('发布成功');
         renderHome();
-    } catch (e) {
-        showToast(e.message);
-    } finally {
-        dom.composerSubmit.label = '发布';
-        dom.composerSubmit.disabled = false;
+    } catch (e) { showToast(e.message); }
+    finally { dom.composerSubmit.textContent = '发布'; dom.composerSubmit.disabled = false; }
+});
+
+dom.composerCancel.addEventListener('click', () => dialogClose(dom.composerOverlay));
+
+// ===== Image Viewer (全屏覆盖层) =====
+// 创建查看器 DOM（单例）
+let _viewerOverlay = null;
+let _viewerImg = null;
+
+function createImageViewer() {
+    if (_viewerOverlay) return;
+    _viewerOverlay = document.createElement('div');
+    _viewerOverlay.id = 'imageViewerOverlay';
+    _viewerImg = document.createElement('img');
+    _viewerImg.draggable = false;
+    _viewerImg._scale = 1;
+    _viewerImg._tx = 0;
+    _viewerImg._ty = 0;
+    _viewerOverlay.appendChild(_viewerImg);
+    document.body.appendChild(_viewerOverlay);
+
+    // ---- 关闭 ----
+    function close() {
+        _viewerOverlay.classList.remove('open');
+        _viewerOverlay.style.opacity = '0';
+        _viewerImg.style.transform = 'scale(1) translate(0px, 0px)';
+        _viewerImg._scale = 1; _viewerImg._tx = 0; _viewerImg._ty = 0;
+        _viewerOverlay.addEventListener('transitionend', function h() {
+            _viewerOverlay.style.display = 'none';
+            _viewerOverlay.removeEventListener('transitionend', h);
+        }, { once: true });
     }
-});
+    function apply() {
+        _viewerImg.style.transform = `scale(${_viewerImg._scale})translate(${_viewerImg._tx||0}px,${_viewerImg._ty||0}px)`;
+    }
+    function clamp() {
+        const s = _viewerImg._scale || 1;
+        const r = _viewerImg.getBoundingClientRect();
+        const vw = window.innerWidth, vh = window.innerHeight;
+        let mx = 0, my = 0;
+        if (r.width * s > vw) mx = (r.width * s - vw) / (2 * s);
+        if (r.height * s > vh) my = (r.height * s - vh) / (2 * s);
+        _viewerImg._tx = Math.max(-mx, Math.min(mx, _viewerImg._tx));
+        _viewerImg._ty = Math.max(-my, Math.min(my, _viewerImg._ty));
+    }
 
-dom.composerCancel.addEventListener('click', () => {
-    dialogClose(dom.composerDialog);
-});
+    // ---- 点击遮罩关闭 ----
+    let _hasDragged = false;
+    _viewerOverlay.addEventListener('click', function(e) {
+        if (_hasDragged) { _hasDragged = false; return; }
+        close();
+    });
 
-// ===== 图片查看器 =====
-let _viewerImageSrc = '';
+    // ---- PC 鼠标拖拽 ----
+    let _drag = false;
+    let _sx = 0, _sy = 0, _ix = 0, _iy = 0;
+    _viewerOverlay.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        _drag = true; _hasDragged = false;
+        _sx = e.clientX; _sy = e.clientY;
+        _ix = _viewerImg._tx || 0; _iy = _viewerImg._ty || 0;
+        _viewerOverlay.style.cursor = 'grabbing';
+        _viewerImg.style.transition = 'none';
+    });
+    window.addEventListener('mousemove', function(e) {
+        if (!_drag) return;
+        const dx = e.clientX - _sx, dy = e.clientY - _sy;
+        const s = _viewerImg._scale || 1;
+        _viewerImg._tx = _ix + dx / s; _viewerImg._ty = _iy + dy / s;
+        clamp(); apply();
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) _hasDragged = true;
+    });
+    window.addEventListener('mouseup', function() {
+        if (_drag) { _drag = false; _viewerOverlay.style.cursor = 'grab'; _viewerImg.style.transition = 'transform 0.2s ease'; }
+    });
+
+    // ---- PC 滚轮缩放 ----
+    _viewerOverlay.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        let s = _viewerImg._scale || 1;
+        s = Math.min(5, Math.max(0.5, s + (e.deltaY > 0 ? -0.2 : 0.2)));
+        _viewerImg._scale = s; clamp(); apply();
+    }, { passive: false });
+
+    // ---- 触摸事件 ----
+    let ts = { touching: false, lastTap: 0, pinchD: 0, pinchS: 1, px: 0, py: 0, ipx: 0, ipy: 0, moved: false, fingers: 0 };
+    function dist(t1, t2) { return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY); }
+    _viewerOverlay.addEventListener('touchstart', function(e) {
+        const t = e.touches;
+        ts.touching = true; ts.fingers = t.length; ts.moved = false;
+        if (t.length === 1) {
+            const now = Date.now();
+            if (now - ts.lastTap < 300) {
+                e.preventDefault();
+                if (_viewerImg._scale > 1.2) {
+                    _viewerImg._scale = 1; _viewerImg._tx = 0; _viewerImg._ty = 0;
+                } else {
+                    _viewerImg._scale = 2.5;
+                    const r = _viewerImg.getBoundingClientRect();
+                    _viewerImg._tx = (window.innerWidth / 2 - t[0].clientX) / _viewerImg._scale;
+                    _viewerImg._ty = (window.innerHeight / 2 - t[0].clientY) / _viewerImg._scale;
+                    clamp();
+                }
+                _viewerImg.style.transition = 'transform 0.3s ease'; apply();
+                ts.lastTap = 0; return;
+            }
+            ts.lastTap = now;
+            e.preventDefault();
+            _viewerImg.style.transition = 'none';
+            ts.px = t[0].clientX; ts.py = t[0].clientY;
+            ts.ipx = _viewerImg._tx || 0; ts.ipy = _viewerImg._ty || 0;
+            _hasDragged = false;
+        } else if (t.length === 2) {
+            e.preventDefault(); _viewerImg.style.transition = 'none';
+            ts.pinchD = dist(t[0], t[1]); ts.pinchS = _viewerImg._scale || 1;
+            ts.ipx = _viewerImg._tx || 0; ts.ipy = _viewerImg._ty || 0;
+            const cx = (t[0].clientX + t[1].clientX) / 2;
+            const cy = (t[0].clientY + t[1].clientY) / 2;
+            ts.px = cx; ts.py = cy;
+            _hasDragged = true;
+        }
+    }, { passive: false });
+    _viewerOverlay.addEventListener('touchmove', function(e) {
+        if (!ts.touching) return;
+        const t = e.touches;
+        if (t.length === 1 && ts.fingers === 1) {
+            e.preventDefault();
+            const dx = t[0].clientX - ts.px, dy = t[0].clientY - ts.py;
+            const s = _viewerImg._scale || 1;
+            _viewerImg._tx = ts.ipx + dx / s; _viewerImg._ty = ts.ipy + dy / s;
+            clamp(); apply();
+            if (Math.abs(dx) > 5 || Math.abs(dy) > 5) { _hasDragged = true; ts.moved = true; }
+        } else if (t.length === 2) {
+            e.preventDefault();
+            const d = dist(t[0], t[1]);
+            let ns = ts.pinchS * (d / ts.pinchD);
+            ns = Math.min(5, Math.max(0.5, ns));
+            _viewerImg._scale = ns;
+            const cx = (t[0].clientX + t[1].clientX) / 2;
+            const cy = (t[0].clientY + t[1].clientY) / 2;
+            _viewerImg._tx = ts.ipx + (cx - ts.px) / ns;
+            _viewerImg._ty = ts.ipy + (cy - ts.py) / ns;
+            clamp(); apply();
+            _hasDragged = true; ts.moved = true;
+        }
+    }, { passive: false });
+    function touchEnd(e) {
+        if (e.touches.length === 0) {
+            const wasSingle = ts.fingers === 1;
+            const noMove = !ts.moved;
+            ts.touching = false; ts.fingers = 0;
+            _viewerImg.style.transition = 'transform 0.2s ease';
+            if (_viewerImg._scale < 1) { _viewerImg._scale = 1; _viewerImg._tx = 0; _viewerImg._ty = 0; apply(); }
+            if (_viewerImg._scale > 5) { _viewerImg._scale = 5; clamp(); apply(); }
+            if (wasSingle && noMove && _viewerImg._scale <= 1) { _hasDragged = false; close(); return; }
+            _hasDragged = noMove ? false : true;
+        } else if (e.touches.length === 1) {
+            ts.fingers = 1;
+            ts.px = e.touches[0].clientX; ts.py = e.touches[0].clientY;
+            ts.ipx = _viewerImg._tx || 0; ts.ipy = _viewerImg._ty || 0;
+        }
+    }
+    _viewerOverlay.addEventListener('touchend', touchEnd, { passive: false });
+    _viewerOverlay.addEventListener('touchcancel', touchEnd, { passive: false });
+}
 
 function openImageViewer(src) {
-    _viewerImageSrc = src;
-    dom.imageViewerImg.src = src;
-    dialogOpen(dom.imageViewerDialog);
+    createImageViewer();
+    _viewerImg.src = src;
+    _viewerImg._scale = 1; _viewerImg._tx = 0; _viewerImg._ty = 0;
+    _viewerImg.style.transform = 'scale(1) translate(0px, 0px)';
+    _viewerOverlay.style.display = 'flex';
+    requestAnimationFrame(() => { _viewerOverlay.style.opacity = '1'; _viewerOverlay.classList.add('open'); });
 }
-dom.imageViewerClose.addEventListener('click', () => dialogClose(dom.imageViewerDialog));
 
-dom.imageViewerOpen.addEventListener('click', () => {
-    if (_viewerImageSrc) {
-        window.open(_viewerImageSrc, '_blank');
-    }
-});
+// ===== 绑定图片点击事件（缩略图 → 打开查看器）=====
+function bindImageEvents(imgEl) {
+    imgEl.addEventListener('click', () => openImageViewer(imgEl.src));
+}
 
-dom.imageViewerCopy.addEventListener('click', async () => {
-    if (!_viewerImageSrc) return;
-    try {
-        await navigator.clipboard.writeText(_viewerImageSrc);
-        showToast('图片直链已复制到剪贴板');
-    } catch (e) {
-        showToast('复制失败');
-    }
-});
-
-// ===== 通知 =====
-dom.btnNotifications.addEventListener('click', () => {
-    loadNotifications();
-    dialogOpen(dom.notifDialog);
-});
+// ===== Notifications =====
+dom.btnNotifications.addEventListener('click', () => { loadNotifications(); dialogOpen(dom.notifOverlay); });
 
 async function loadNotifications() {
-    dom.notifList.innerHTML = '<div class="loading-indicator"><md-circular-progress indeterminate></md-circular-progress></div>';
+    dom.notifList.innerHTML = '<div class="loading-indicator"><div class="spinner"></div></div>';
     try {
         const data = await api('GET', '/notifications');
         if (data.list.length === 0) {
             dom.notifList.innerHTML = '<div class="notif-empty">暂无通知</div>';
         } else {
-            // 分组：未读和已读
             const unread = data.list.filter(n => !n.is_read);
             const read = data.list.filter(n => n.is_read);
-
             function renderNotifItems(items) {
                 return items.map(n => {
-                    const text = n.type === 'like' ? '赞了你的动态' :
-                                 n.type === 'comment' ? '评论了你的动态' :
-                                 '回复了你的评论';
-                    return `
-                    <div class="notif-item ${n.is_read ? '' : 'unread'}" data-post-id="${n.post_id || ''}">
-                        <div class="notif-text">
-                            <strong>${escapeHtml(n.actor_nickname || n.actor_username)}</strong> ${text}
-                        </div>
+                    const text = n.type === 'like' ? '赞了你的动态' : n.type === 'comment' ? '评论了你的动态' : '回复了你的评论';
+                    return `<div class="notif-item ${n.is_read ? '' : 'unread'}" data-post-id="${n.post_id || ''}">
+                        <div class="notif-text"><strong>${escapeHtml(n.actor_nickname || n.actor_username)}</strong> ${text}</div>
                         <div class="notif-time">${formatTime(n.created_at)}</div>
                     </div>`;
                 }).join('\n');
             }
-
             let html = '';
-            if (unread.length > 0) {
-                html += '<div class="notif-section-title">未读</div>';
-                html += renderNotifItems(unread);
-            }
-            if (unread.length > 0 && read.length > 0) {
-                html += '<div class="notif-divider"></div>';
-            }
-            if (read.length > 0) {
-                html += '<div class="notif-section-title">已读</div>';
-                html += renderNotifItems(read);
-            }
+            if (unread.length > 0) { html += '<div class="notif-section-title">未读</div>' + renderNotifItems(unread); }
+            if (unread.length > 0 && read.length > 0) html += '<div class="notif-divider"></div>';
+            if (read.length > 0) html += '<div class="notif-section-title">已读</div>' + renderNotifItems(read);
             dom.notifList.innerHTML = html;
-
-            // 点击通知跳转到对应动态
             dom.notifList.querySelectorAll('.notif-item').forEach(el => {
-                el.style.cursor = 'pointer';
-                el.addEventListener('click', () => {
+                el.addEventListener('click', async () => {
                     const postId = el.dataset.postId;
                     if (!postId) return;
-                    dialogClose(dom.notifDialog);
-                    navigateTo('home');
-                    scrollToPost(postId);
+                    dialogClose(dom.notifOverlay);
+                    await navigateTo('home');
+                    await scrollToPost(postId);
                 });
             });
         }
-        // 更新未读数量
         await checkUnread();
-    } catch (e) {
-        dom.notifList.innerHTML = `<div class="notif-empty">加载失败: ${e.message}</div>`;
-    }
+    } catch (e) { dom.notifList.innerHTML = retryArea('加载失败: ' + e.message, loadNotifications); }
 }
 
 dom.notifReadAll.addEventListener('click', async () => {
@@ -951,12 +919,9 @@ dom.notifReadAll.addEventListener('click', async () => {
         dom.notifBadge.style.display = 'none';
         dom.notifList.querySelectorAll('.notif-item').forEach(el => el.classList.remove('unread'));
         showToast('已全部标记已读');
-    } catch (e) {
-        showToast(e.message);
-    }
+    } catch (e) { showToast(e.message); }
 });
-
-dom.notifClose.addEventListener('click', () => dialogClose(dom.notifDialog));
+dom.notifClose.addEventListener('click', () => dialogClose(dom.notifOverlay));
 
 async function checkUnread() {
     if (!state.user) return;
@@ -967,60 +932,38 @@ async function checkUnread() {
     } catch (_) {}
 }
 
-// ===== 个人主页 =====
+// ===== Profile =====
 async function renderProfile() {
     if (!state.user) {
         dom.main.innerHTML = `
             <div class="section-title">我的</div>
             <div class="profile-header">
-                <p style="color: var(--md-sys-color-on-surface-variant); margin-bottom: 16px;">请先登录以查看个人主页</p>
-                <md-filled-button id="profile-login-btn">
-                    <md-icon slot="icon">login</md-icon>
-                    登录 / 注册
-                </md-filled-button>
-            </div>
-        `;
-        $('#profile-login-btn')?.addEventListener('click', () => {
-            switchAuthMode('login');
-            dialogOpen(dom.authDialog);
-        });
+                <p style="color:var(--ba-text-muted);margin-bottom:16px">请先登录以查看个人主页</p>
+                <button class="btn-primary" id="profile-login-btn">${icon('login')} 登录 / 注册</button>
+            </div>`;
+        $('#profile-login-btn')?.addEventListener('click', () => { switchAuthMode('login'); dialogOpen(dom.authOverlay); });
         return;
     }
-
     dom.main.innerHTML = `
         <div class="profile-header">
-            <img src="${state.user.avatar || '/uploads/avatars/default.svg'}" 
-                 class="profile-avatar" id="profile-avatar-img"
-                 onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><circle cx="40" cy="40" r="40" fill="#e0e0e0"/><text x="40" y="50" text-anchor="middle" font-size="30" fill="#999">' + (state.user.nickname || state.user.username)[0] + '</text></svg>')}'">
-            <div class="profile-nickname" id="profile-nickname" contenteditable="true" data-original="${escapeHtml(state.user.nickname || state.user.username)}">
-                ${escapeHtml(state.user.nickname || state.user.username)}
-            </div>
+            <img src="${avatarSrc(state.user.avatar)}" class="profile-avatar" id="profile-avatar-img"
+                 onerror="${avatarOnerror(state.user.nickname || state.user.username)}">
+            <div class="profile-nickname" id="profile-nickname" contenteditable="true" data-original="${escapeHtml(state.user.nickname || state.user.username)}">${escapeHtml(state.user.nickname || state.user.username)}</div>
             <div class="profile-username">@${escapeHtml(state.user.username)}</div>
-            <div class="profile-bio" id="profile-bio" contenteditable="true" data-original="${escapeHtml(state.user.bio || '')}">
-                ${state.user.bio ? escapeHtml(state.user.bio) : '这个人很懒，什么都没写...'}
-            </div>
+            <div class="profile-bio" id="profile-bio" contenteditable="true" data-original="${escapeHtml(state.user.bio || '')}">${state.user.bio ? escapeHtml(state.user.bio) : '这个人很懒，什么都没写...'}</div>
             <div class="profile-stats">
                 <div class="stat"><div class="stat-num" id="profile-post-count">0</div><div class="stat-label">动态</div></div>
             </div>
             <div class="profile-edit-btn">
-                <md-text-button id="btn-edit-avatar">
-                    <md-icon slot="icon">photo_camera</md-icon>
-                    更换头像
-                </md-text-button>
-                <md-text-button id="btn-logout" style="color:var(--md-sys-color-error);">
-                    退出登录
-                </md-text-button>
+                <button class="btn-text" id="btn-edit-avatar">${icon('photo_camera')} 更换头像</button>
+                <button class="btn-text" id="btn-logout" style="color:#d4a0a0">退出登录</button>
             </div>
             <input type="file" id="avatar-input" accept="image/*" style="display:none">
         </div>
         <div class="section-title">我的动态</div>
-        <div id="my-posts"></div>
-    `;
+        <div id="my-posts"></div>`;
 
-    // 退出登录
     $('#btn-logout')?.addEventListener('click', handleLogout);
-
-    // 上传头像
     $('#btn-edit-avatar')?.addEventListener('click', () => $('#avatar-input').click());
     $('#avatar-input')?.addEventListener('change', async () => {
         const file = $('#avatar-input').files[0];
@@ -1031,109 +974,75 @@ async function renderProfile() {
             const result = await api('POST', '/user/avatar', formData);
             state.user.avatar = result.avatar;
             updateAuthUI();
-            $('#profile-avatar-img').src = result.avatar;
+            $('#profile-avatar-img').src = avatarSrc(result.avatar);
             showToast('头像更新成功');
-        } catch (e) {
-            showToast(e.message);
-        }
+        } catch (e) { showToast(e.message); }
     });
 
-    // 修改简介
     const bioDiv = $('#profile-bio');
     if (bioDiv) {
         const saveBio = async () => {
             const newBio = bioDiv.innerText.trim();
-            const originalBio = bioDiv.dataset.original;
-            if (newBio === originalBio) return;
+            if (newBio === bioDiv.dataset.original) return;
             try {
                 const result = await api('POST', '/user/bio', { bio: newBio });
                 state.user.bio = result.bio;
                 bioDiv.dataset.original = newBio;
                 showToast('简介已更新');
-            } catch (e) {
-                showToast(e.message);
-                bioDiv.innerText = originalBio;
-            }
+            } catch (e) { showToast(e.message); bioDiv.innerText = bioDiv.dataset.original; }
         };
         bioDiv.addEventListener('blur', saveBio);
-        bioDiv.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                bioDiv.blur();
-            }
-        });
+        bioDiv.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); bioDiv.blur(); } });
     }
 
-    // 修改昵称
     const nickDiv = $('#profile-nickname');
     if (nickDiv) {
         const saveNickname = async () => {
             const newNick = nickDiv.innerText.trim();
-            const originalNick = nickDiv.dataset.original;
-            if (newNick === originalNick) return;
+            if (newNick === nickDiv.dataset.original) return;
             try {
                 const result = await api('POST', '/user/nickname', { nickname: newNick });
                 state.user.nickname = result.nickname;
                 nickDiv.dataset.original = newNick;
                 showToast('昵称已更新');
-            } catch (e) {
-                showToast(e.message);
-                nickDiv.innerText = originalNick;
-            }
+            } catch (e) { showToast(e.message); nickDiv.innerText = nickDiv.dataset.original; }
         };
         nickDiv.addEventListener('blur', saveNickname);
-        nickDiv.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                nickDiv.blur();
-            }
-        });
+        nickDiv.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); nickDiv.blur(); } });
     }
 
-    // 加载用户动态
     try {
         const data = await api('GET', `/posts?page=1&size=20`);
         const myPosts = data.list.filter(p => p.user_id === state.user.id);
-        const myPostsCount = myPosts.length;
-        $('#profile-post-count').textContent = myPostsCount;
-
+        $('#profile-post-count').textContent = myPosts.length;
         if (myPosts.length === 0) {
             $('#my-posts').innerHTML = '<div class="end-indicator">还没有发布过动态</div>';
         } else {
             state.posts = myPosts;
             $('#my-posts').innerHTML = myPosts.map(p => renderPostCard(p)).join('\n');
-            $('#my-posts').querySelectorAll('.like-btn').forEach(btn => {
-                btn.addEventListener('click', () => handleLike(btn.dataset.postId));
-            });
-            $('#my-posts').querySelectorAll('.comment-btn').forEach(btn => {
-                btn.addEventListener('click', () => openComments(btn.dataset.postId));
-            });
-            $('#my-posts').querySelectorAll('.recall-btn').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    const postId = btn.dataset.postId;
-                    if (!confirm('确定撤回这条动态？')) return;
-                    try {
-                        await api('DELETE', `/posts/${postId}`);
-                        showToast('已撤回');
-                        btn.closest('.post-card').remove();
-                        const idx = state.posts.findIndex(p => p.id == postId);
-                        if (idx !== -1) state.posts.splice(idx, 1);
-                    } catch (e) {
-                        showToast(e.message);
-                    }
-                });
-            });
-            $('#my-posts').querySelectorAll('.post-images img').forEach(img => {
-                img.addEventListener('click', () => openImageViewer(img.src));
-            });
+            setupPostCardEvents('#my-posts');
         }
-    } catch (e) {
-        $('#my-posts').innerHTML = `<div class="end-indicator">加载失败: ${e.message}</div>`;
-    }
+    } catch (e) { $('#my-posts').innerHTML = retryArea('加载失败: ' + e.message, renderProfile); }
 }
 
-// ===== 用户详情页（查看他人主页） =====
+function setupPostCardEvents(container) {
+    const c = $(container);
+    c.querySelectorAll('.like-btn').forEach(btn => btn.addEventListener('click', () => handleLike(btn.dataset.postId)));
+    c.querySelectorAll('.comment-btn').forEach(btn => btn.addEventListener('click', () => openComments(btn.dataset.postId)));
+    c.querySelectorAll('.recall-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            if (!confirm('确定撤回这条动态？')) return;
+            try { await api('DELETE', `/posts/${btn.dataset.postId}`); showToast('已撤回'); btn.closest('.post-card').remove(); }
+            catch (e) { showToast(e.message); }
+        });
+    });
+    c.querySelectorAll('.post-images img').forEach(img => bindImageEvents(img));
+    observeRevealElements();
+}
+
+// ===== User Profile (viewing others) =====
 function navigateToUserProfile(userId) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     state.currentPage = 'user';
     state.viewUserId = userId;
     $$('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -1141,54 +1050,39 @@ function navigateToUserProfile(userId) {
 }
 
 async function renderUserProfile(userId) {
-    dom.main.innerHTML = '<div class="loading-indicator"><md-circular-progress indeterminate></md-circular-progress></div>';
-
+    dom.main.innerHTML = '<div class="loading-indicator"><div class="spinner"></div></div>';
     try {
         const [user, postsData] = await Promise.all([
             api('GET', `/user/${userId}`),
             api('GET', `/posts?page=1&size=20`),
         ]);
-
         const isSelf = state.user && state.user.id === userId;
-
         dom.main.innerHTML = `
             <div class="profile-header">
                 <div class="user-profile-back">
-                    <md-text-button id="btn-back-from-user">
-                        <md-icon slot="icon">arrow_back</md-icon>
-                        返回
-                    </md-text-button>
+                    <button class="btn-text" id="btn-back-from-user">${icon('arrow_back')} 返回</button>
                 </div>
-                <img src="${user.avatar || '/uploads/avatars/default.svg'}" 
-                     class="profile-avatar"
-                     onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><circle cx="40" cy="40" r="40" fill="#e0e0e0"/><text x="40" y="50" text-anchor="middle" font-size="30" fill="#999">' + (user.nickname || user.username)[0] + '</text></svg>')}'">
+                <img src="${avatarSrc(user.avatar)}" class="profile-avatar"
+                     onerror="${avatarOnerror(user.nickname || user.username)}">
                 <div class="profile-nickname">${escapeHtml(user.nickname || user.username)}</div>
                 <div class="profile-username">@${escapeHtml(user.username)}</div>
                 <div class="profile-bio">${user.bio ? escapeHtml(user.bio) : '这个人很懒，什么都没写...'}</div>
                 <div class="profile-stats">
                     <div class="stat"><div class="stat-num">${user.posts_count || 0}</div><div class="stat-label">动态</div></div>
                 </div>
-                ${!isSelf ? `
-                <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
-                    <md-filled-tonal-button id="btn-start-chat" data-user-id="${userId}">
-                        <md-icon slot="icon">chat</md-icon>
-                        发私信
-                    </md-filled-tonal-button>
-                </div>
-                ` : ''}
+                ${!isSelf ? `<div style="margin-top:12px;display:flex;gap:8px;justify-content:center">
+                    <button class="btn-primary" id="btn-start-chat" data-user-id="${userId}">${icon('chat')} 发私信</button>
+                </div>` : ''}
             </div>
             <div class="section-title">${escapeHtml(user.nickname || user.username)} 的动态</div>
-            <div id="user-posts"></div>
-        `;
+            <div id="user-posts"></div>`;
 
         $('#btn-back-from-user')?.addEventListener('click', () => {
             state.currentPage = 'home';
             $$('.nav-btn').forEach(b => b.classList.remove('active'));
-            const homeBtn = document.querySelector('.nav-btn[data-page="home"]');
-            if (homeBtn) homeBtn.classList.add('active');
+            document.querySelector('.nav-btn[data-page="home"]')?.classList.add('active');
             renderHome();
         });
-
         $('#btn-start-chat')?.addEventListener('click', async () => {
             const otherUserId = parseInt($('#btn-start-chat').dataset.userId);
             if (!otherUserId) return;
@@ -1196,9 +1090,7 @@ async function renderUserProfile(userId) {
                 const result = await api('POST', '/conversations', { type: 'private', user_id: otherUserId });
                 state.currentConvId = result.id;
                 navigateTo('chat');
-            } catch (e) {
-                showToast(e.message);
-            }
+            } catch (e) { showToast(e.message); }
         });
 
         const userPosts = postsData.list.filter(p => p.user_id === userId);
@@ -1208,108 +1100,71 @@ async function renderUserProfile(userId) {
         } else {
             state.posts = userPosts;
             container.innerHTML = userPosts.map(p => renderPostCard(p)).join('\n');
-            container.querySelectorAll('.like-btn').forEach(btn => {
-                btn.addEventListener('click', () => handleLike(btn.dataset.postId));
-            });
-            container.querySelectorAll('.comment-btn').forEach(btn => {
-                btn.addEventListener('click', () => openComments(btn.dataset.postId));
-            });
-            container.querySelectorAll('.recall-btn').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    const postId = btn.dataset.postId;
-                    if (!confirm('确定撤回这条动态？')) return;
-                    try {
-                        await api('DELETE', `/posts/${postId}`);
-                        showToast('已撤回');
-                        btn.closest('.post-card').remove();
-                        const idx = state.posts.findIndex(p => p.id == postId);
-                        if (idx !== -1) state.posts.splice(idx, 1);
-                    } catch (e) {
-                        showToast(e.message);
-                    }
-                });
-            });
-            container.querySelectorAll('.post-images img').forEach(img => {
-                img.addEventListener('click', () => openImageViewer(img.src));
-            });
+            setupPostCardEvents('#user-posts');
         }
     } catch (e) {
         dom.main.innerHTML = `
             <div class="profile-header">
-                <div class="user-profile-back">
-                    <md-text-button id="btn-back-from-user">
-                        <md-icon slot="icon">arrow_back</md-icon>
-                        返回
-                    </md-text-button>
-                </div>
-                <p style="color:var(--md-sys-color-error);text-align:center;">加载失败: ${escapeHtml(e.message)}</p>
-            </div>
-        `;
-        $('#btn-back-from-user')?.addEventListener('click', () => {
-            state.currentPage = 'home';
-            renderHome();
-        });
+                <button class="btn-text" id="btn-back-from-user">${icon('arrow_back')} 返回</button>
+                <p style="color:#d4a0a0;text-align:center">加载失败: ${escapeHtml(e.message)}</p>
+            </div>`;
+        $('#btn-back-from-user')?.addEventListener('click', () => { state.currentPage = 'home'; renderHome(); });
     }
 }
 
-// ===== 发现页 =====
+// ===== Explore Page =====
 async function renderExplore() {
     dom.main.innerHTML = `
         <div class="section-title">发现</div>
-        <div class="card" style="background:var(--md-sys-color-surface-container-low);border-radius:16px;padding:24px;box-shadow:var(--md-elevation-level1);text-align:center;">
-            <md-icon style="font-size:48px;color:var(--md-sys-color-primary);margin-bottom:12px;">explore</md-icon>
-            <h3 style="margin-bottom:8px;">探索 CRMoment</h3>
-            <p style="color:var(--md-sys-color-on-surface-variant);line-height:1.6;">
-                一个轻量的动态分享社区。<br>
-                浏览最新动态，分享你的生活瞬间。
-            </p>
-            <div style="margin-top:20px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
-                <md-filled-button id="explore-home-btn">
-                    <md-icon slot="icon">home</md-icon>
-                    去看看动态
-                </md-filled-button>
-                ${!state.user ? `
-                <md-outlined-button id="explore-login-btn">
-                    <md-icon slot="icon">login</md-icon>
-                    登录体验更多
-                </md-outlined-button>
-                ` : ''}
+        <div style="background:var(--ba-card-bg);border-radius:var(--ba-radius-lg);padding:16px 24px 20px;border:1px solid var(--ba-card-border);box-shadow:var(--ba-card-shadow);text-align:center;margin-bottom:16px">
+            <span class="material-symbols-outlined" style="font-size:48px;color:var(--ba-blue);margin-bottom:12px;display:block">explore</span>
+            <h3 style="margin-bottom:8px;color:var(--ba-text)">探索 CRMoment</h3>
+            <p style="color:var(--ba-text-secondary);line-height:1.6">一个轻量的动态分享社区。<br>浏览最新动态，分享你的生活瞬间。</p>
+            <div style="margin-top:20px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+                <button class="btn-primary" id="explore-home-btn">${icon('home')} 去看看动态</button>
+                ${!state.user ? `<button class="btn-secondary" id="explore-login-btn">${icon('login')} 登录体验更多</button>` : ''}
             </div>
         </div>
-
-        <!-- 音乐广场 -->
         <div class="music-section-header">
-            <div class="section-title"><md-icon style="font-size:20px;vertical-align:middle;margin-right:4px;">music_note</md-icon> 音乐广场</div>
+            <div class="section-title"><span class="material-symbols-outlined" style="font-size:20px;vertical-align:middle;margin-right:4px">music_note</span> 音乐广场</div>
             <div class="music-header-actions">
-                <md-filled-tonal-button id="btn-search-music" style="--md-filled-tonal-button-container-shape:28px;--md-filled-tonal-button-container-height:36px;">
-                    <md-icon slot="icon">search</md-icon>
-                    搜索
-                </md-filled-tonal-button>
-                ${state.user ? '<md-filled-tonal-button id="btn-add-music" style="--md-filled-tonal-button-container-shape:28px;--md-filled-tonal-button-container-height:36px;"><md-icon slot="icon">add</md-icon>添加音乐</md-filled-tonal-button>' : ''}
+                <button class="btn-primary" id="btn-search-music" style="padding:6px 16px;font-size:13px">${icon('search')} 搜索</button>
+                ${state.user ? `<button class="btn-primary" id="btn-add-music" style="padding:6px 16px;font-size:13px">${icon('add')} 添加音乐</button>` : ''}
             </div>
         </div>
         <div id="music-list"></div>
-        <div id="music-loading" class="loading-indicator"><md-circular-progress indeterminate></md-circular-progress></div>
-    `;
+        <div id="music-loading" class="loading-indicator"><div class="spinner"></div></div>`;
 
     $('#explore-home-btn')?.addEventListener('click', () => navigateTo('home'));
-    $('#explore-login-btn')?.addEventListener('click', () => {
-        switchAuthMode('login');
-        dialogOpen(dom.authDialog);
-    });
+    $('#explore-login-btn')?.addEventListener('click', () => { switchAuthMode('login'); dialogOpen(dom.authOverlay); });
     $('#btn-add-music')?.addEventListener('click', openAddMusicDialog);
     $('#btn-search-music')?.addEventListener('click', openSearchDialog);
-
-    // 加载音乐列表
     await loadMusic();
 }
 
-/**
- * 加载音乐列表
- */
+async function loadMusic() {
+    const listEl = $('#music-list');
+    if (listEl) listEl.style.opacity = '0.4';
+    try {
+        const q = state.musicSearchQuery || '';
+        const url = q ? `/music?page=1&size=200&q=${encodeURIComponent(q)}` : '/music?page=1&size=200';
+        const data = await api('GET', url);
+        state.music = data.list || [];
+    } catch (e) {
+        state.music = [];
+        const ml = $('#music-list');
+        if (ml) ml.innerHTML = retryArea('加载失败: ' + e.message, loadMusic);
+        const ld = $('#music-loading');
+        if (ld) ld.style.display = 'none';
+        if (listEl) listEl.style.opacity = '1';
+        return;
+    }
+    if (listEl) listEl.style.opacity = '1';
+    renderMusicList();
+}
+
 function openSearchDialog() {
-    dialogOpen($('#search-music-dialog'));
-    // 弹窗打开后再设值，否则 MWC 在无尺寸时计算 label 动画会 NaN
+    dialogOpen($('#search-music-overlay'));
     setTimeout(() => {
         const searchInput = $('#music-search');
         if (searchInput) searchInput.value = state.musicSearchQuery || '';
@@ -1318,82 +1173,59 @@ function openSearchDialog() {
 }
 
 function handleSearchSubmit() {
-    const q = $('#music-search')?.value?.trim() || '';
-    state.musicSearchQuery = q;
-    dialogClose($('#search-music-dialog'));
+    state.musicSearchQuery = $('#music-search')?.value?.trim() || '';
+    dialogClose($('#search-music-overlay'));
     loadMusic();
 }
 
 function handleSearchClear() {
     $('#music-search').value = '';
     state.musicSearchQuery = '';
-    dialogClose($('#search-music-dialog'));
+    dialogClose($('#search-music-overlay'));
     loadMusic();
 }
 
-/**
- * 渲染音乐卡片列表
- */
 function renderMusicList() {
     const container = $('#music-list');
     const loading = $('#music-loading');
     if (!container) return;
     if (loading) loading.style.display = 'none';
-
     if (state.music.length === 0) {
-        container.innerHTML = '<p style="color:var(--md-sys-color-on-surface-variant);text-align:center;padding:24px;">还没有音乐，快来添加第一首吧</p>';
+        container.innerHTML = '<p style="color:var(--ba-text-muted);text-align:center;padding:24px">还没有音乐，快来添加第一首吧</p>';
         return;
     }
-
     container.innerHTML = state.music.map(item => {
         const displayName = escapeHtml(item.nickname || item.username);
         const timeStr = formatTime(item.created_at);
-        const params = new URLSearchParams({
-            id: item.id,
-            music: item.music_url,
-            lrc: item.lrc_url,
-        });
+        const params = new URLSearchParams({ id: item.id, music: item.music_url, lrc: item.lrc_url });
         if (item.bg_url) params.set('bg', item.bg_url);
-        if (item.lrc_pos && item.lrc_pos !== 'center') params.set('lrc_pos', item.lrc_pos);
-        if (item.lrc_color && item.lrc_color !== 'light') params.set('lrc_color', item.lrc_color);
+        if (item.video_url) params.set('video', item.video_url);
+        if (item.lrc_pos && item.lrc_pos !== 'center') params.set('pos', item.lrc_pos);
+        if (item.lrc_color && item.lrc_color !== 'light') params.set('color', item.lrc_color);
         const musicUrl = '/crmusic.html?' + params.toString();
         const isOwner = state.user && String(item.user_id) === String(state.user.id);
-
         return `
             <div class="music-card" data-music-url="${escapeHtml(musicUrl)}">
                 <div class="music-card-title">${escapeHtml(item.title)}</div>
                 <div class="music-card-meta">
                     <span class="music-card-author" data-user-id="${item.user_id}">${displayName}</span>
-                    <span class="music-card-plays">${item.plays_count} 次播放</span>
+                    <span>${item.plays_count} 次播放</span>
                     <span>${timeStr}</span>
-                    ${isOwner ? `
-                    <span class="music-actions">
-                        <md-text-button class="music-edit-btn" data-id="${item.id}" style="--md-text-button-container-shape:8px;--md-text-button-container-height:28px;font-size:12px;min-width:0;">
-                            <md-icon slot="icon" style="font-size:16px;">edit</md-icon>
-                            编辑
-                        </md-text-button>
-                        <md-text-button class="music-del-btn" data-id="${item.id}" style="--md-text-button-container-shape:8px;--md-text-button-container-height:28px;font-size:12px;min-width:0;color:var(--md-sys-color-error);">
-                            <md-icon slot="icon" style="font-size:16px;">delete</md-icon>
-                            删除
-                        </md-text-button>
-                    </span>
-                    ` : ''}
+                    ${isOwner ? `<span class="music-actions">
+                        <button class="btn-text music-edit-btn" data-id="${item.id}" style="padding:4px 8px;font-size:12px">${icon('edit')} 编辑</button>
+                        <button class="btn-text music-del-btn" data-id="${item.id}" style="padding:4px 8px;font-size:12px;color:#d4a0a0">${icon('delete')} 删除</button>
+                    </span>` : ''}
                 </div>
-            </div>
-        `;
+            </div>`;
     }).join('');
 
-    // 点击卡片 → 跳转到音乐播放页
     container.querySelectorAll('.music-card').forEach(card => {
         card.addEventListener('click', (e) => {
-            // 如果点击的是作者名字，不要跳转音乐，而是跳转个人主页
             if (e.target.closest('.music-card-author')) return;
             const url = card.dataset.musicUrl;
             if (url) window.open(url, '_blank');
         });
     });
-
-    // 点击作者 → 跳转个人主页
     container.querySelectorAll('.music-card-author').forEach(el => {
         el.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -1401,98 +1233,60 @@ function renderMusicList() {
             if (userId) navigateToUserProfile(userId);
         });
     });
-
-    // 编辑音乐
     container.querySelectorAll('.music-edit-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const id = parseInt(btn.dataset.id);
-            const item = state.music.find(m => m.id === id);
+            const item = state.music.find(m => m.id === parseInt(btn.dataset.id));
             if (item) openAddMusicDialog(item);
         });
     });
-
-    // 删除音乐
     container.querySelectorAll('.music-del-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             e.stopPropagation();
-            const id = parseInt(btn.dataset.id);
             if (!confirm('确定要删除这首音乐吗？')) return;
-            try {
-                await api('DELETE', '/music/' + id);
-                showToast('删除成功');
-                await loadMusic();
-            } catch (err) {
-                showToast(err.message || '删除失败');
-            }
+            try { await api('DELETE', '/music/' + btn.dataset.id); showToast('删除成功'); await loadMusic(); }
+            catch (err) { showToast(err.message || '删除失败'); }
         });
     });
 }
 
-/**
- * 打开添加音乐对话框
- * @param {object|null} editItem - 编辑模式时传入要编辑的音乐对象
- */
 function openAddMusicDialog(editItem) {
-    if (!state.user) {
-        showToast('请先登录');
-        return;
-    }
+    if (!state.user) { showToast('请先登录'); return; }
     state.editingMusicId = editItem ? editItem.id : null;
-    // 清空/填充输入（必须传字符串，MWC 遇到 undefined 会显示 "undefined"）
     dom.musicTitle.value = editItem ? (editItem.title || '') : '';
     dom.musicUrl.value = editItem ? (editItem.music_url || '') : '';
     dom.musicLrcUrl.value = editItem ? (editItem.lrc_url || '') : '';
     dom.musicBgUrl.value = editItem ? (editItem.bg_url || '') : '';
-    // 歌词位置
+    dom.musicVideoUrl.value = editItem ? (editItem.video_url || '') : '';
     const pos = editItem ? (editItem.lrc_pos || 'center') : 'center';
     const posRadio = document.querySelector(`.lrc-pos-radio[name="lrc_pos"][value="${pos}"]`);
     if (posRadio) posRadio.checked = true;
-    // 歌词颜色
     const color = editItem ? (editItem.lrc_color || 'light') : 'light';
     const colorRadio = document.querySelector(`.lrc-pos-radio[name="lrc_color"][value="${color}"]`);
     if (colorRadio) colorRadio.checked = true;
     dom.addMusicError.style.display = 'none';
-    // 修改对话框标题和按钮文字
-    const headline = dom.addMusicDialog.querySelector('[slot="headline"]');
+    const headline = dom.addMusicOverlay.querySelector('.modal-headline');
     if (headline) headline.textContent = editItem ? '编辑音乐' : '添加音乐';
-    dom.addMusicSubmit.label = editItem ? '保存' : '添加';
-    dialogOpen(dom.addMusicDialog);
+    dom.addMusicSubmit.textContent = editItem ? '保存' : '添加';
+    dialogOpen(dom.addMusicOverlay);
 }
 
-/**
- * 处理添加音乐
- */
 async function handleAddMusic() {
     const title = dom.musicTitle.value.trim();
     const musicUrl = dom.musicUrl.value.trim();
     const lrcUrl = dom.musicLrcUrl.value.trim();
     const bgUrl = dom.musicBgUrl.value.trim();
+    const videoUrl = dom.musicVideoUrl.value.trim();
     const lrcPos = (document.querySelector('.lrc-pos-radio[name="lrc_pos"]:checked')?.value) || 'center';
     const lrcColor = (document.querySelector('.lrc-pos-radio[name="lrc_color"]:checked')?.value) || 'light';
-
-    if (!title) {
-        dom.addMusicError.textContent = '请输入音乐名称';
-        dom.addMusicError.style.display = '';
-        return;
-    }
-    if (!musicUrl) {
-        dom.addMusicError.textContent = '请输入音频链接';
-        dom.addMusicError.style.display = '';
-        return;
-    }
-    if (!lrcUrl) {
-        dom.addMusicError.textContent = '请输入歌词文件链接';
-        dom.addMusicError.style.display = '';
-        return;
-    }
-
+    if (!title) { dom.addMusicError.textContent = '请输入音乐名称'; dom.addMusicError.style.display = ''; return; }
+    if (!musicUrl) { dom.addMusicError.textContent = '请输入音频链接'; dom.addMusicError.style.display = ''; return; }
+    if (!lrcUrl) { dom.addMusicError.textContent = '请输入歌词文件链接'; dom.addMusicError.style.display = ''; return; }
     try {
-        dom.addMusicSubmit.label = '处理中...';
+        dom.addMusicSubmit.textContent = '处理中...';
         dom.addMusicSubmit.disabled = true;
-        const body = { title, music_url: musicUrl, lrc_url: lrcUrl, bg_url: bgUrl || undefined, lrc_pos: lrcPos, lrc_color: lrcColor };
-        const isEdit = !!state.editingMusicId;
-        if (isEdit) {
+        const body = { title, music_url: musicUrl, lrc_url: lrcUrl, bg_url: bgUrl || undefined, video_url: videoUrl || undefined, lrc_pos: lrcPos, lrc_color: lrcColor };
+        if (state.editingMusicId) {
             await api('PUT', '/music/' + state.editingMusicId, body);
             state.editingMusicId = null;
             showToast('修改成功');
@@ -1500,61 +1294,37 @@ async function handleAddMusic() {
             await api('POST', '/music', body);
             showToast('添加成功');
         }
-        dialogClose(dom.addMusicDialog);
-        // 重新加载音乐列表
+        dialogClose(dom.addMusicOverlay);
         await loadMusic();
-    } catch (e) {
-        dom.addMusicError.textContent = e.message || '操作失败';
-        dom.addMusicError.style.display = '';
-    } finally {
-        // 如果对话框还开着（失败分支），保留正确的按钮文字
+    } catch (e) { dom.addMusicError.textContent = e.message || '操作失败'; dom.addMusicError.style.display = ''; }
+    finally {
         const stillEditing = !!state.editingMusicId;
-        dom.addMusicSubmit.label = stillEditing ? '保存' : '添加';
+        dom.addMusicSubmit.textContent = stillEditing ? '保存' : '添加';
         dom.addMusicSubmit.disabled = false;
     }
 }
 
-// ===== 聊天子系统 =====
-
-/**
- * 页面 A - 会话列表
- */
+// ===== Chat System =====
 async function renderConversationList() {
-    dom.main.innerHTML = '<div class="loading-indicator"><md-circular-progress indeterminate></md-circular-progress></div>';
-
-    await loadConversations();
-
-    dom.main.innerHTML = `
-        <div class="conv-list-header">
-            <div class="section-title" style="margin:0;">信息</div>
-            <md-filled-tonal-button id="btn-create-group" style="--md-filled-tonal-button-container-shape:24px;">
-                <md-icon slot="icon">group_add</md-icon>
-                创建群聊
-            </md-filled-tonal-button>
-        </div>
-        <div id="conv-list"></div>
-    `;
-
-    $('#btn-create-group')?.addEventListener('click', () => {
-        openCreateGroupDialog();
-    });
-
-    if (state.conversations.length === 0) {
-        $('#conv-list').innerHTML = '<div class="end-indicator">暂无会话</div>';
+    dom.main.innerHTML = '<div class="loading-indicator"><div class="spinner"></div></div>';
+    try {
+        await loadConversations();
+    } catch (e) {
+        dom.main.innerHTML = retryArea('加载失败: ' + e.message, renderConversationList);
         return;
     }
-
-    const listHtml = state.conversations.map(conv => renderConvItem(conv)).join('\n');
-    $('#conv-list').innerHTML = listHtml;
-
+    dom.main.innerHTML = `
+        <div class="conv-list-header">
+            <div class="section-title" style="margin:0">信息</div>
+            <button class="btn-primary" id="btn-create-group" style="padding:6px 16px;font-size:13px">${icon('group_add')} 创建群聊</button>
+        </div>
+        <div id="conv-list"></div>`;
+    $('#btn-create-group')?.addEventListener('click', openCreateGroupDialog);
+    if (state.conversations.length === 0) { $('#conv-list').innerHTML = '<div class="end-indicator">暂无会话</div>'; return; }
+    $('#conv-list').innerHTML = state.conversations.map(conv => renderConvItem(conv)).join('\n');
     state.conversations.forEach(conv => {
         const el = document.getElementById(`conv-item-${conv.id}`);
-        if (el) {
-            el.addEventListener('click', () => {
-                state.currentConvId = conv.id;
-                navigateTo('chat');
-            });
-        }
+        if (el) el.addEventListener('click', () => { state.currentConvId = conv.id; navigateTo('chat'); });
     });
 }
 
@@ -1562,21 +1332,14 @@ function renderConvItem(conv) {
     const lastMsg = conv.last_msg_id ? conv.last_msg_content : '';
     const lastMsgPreview = conv.last_msg_id
         ? (conv.last_msg_user_id && parseInt(conv.last_msg_user_id) !== (state.user?.id)
-            ? `${conv.last_msg_nickname || conv.last_msg_username}: ${lastMsg}`
-            : lastMsg)
+            ? `${conv.last_msg_nickname || conv.last_msg_username}: ${lastMsg}` : lastMsg)
         : '暂无消息';
-
     const timeStr = conv.updated_at ? formatTimeShort(conv.updated_at) : '';
     const unread = conv.unread_count > 0;
 
     if (conv.type === 'group') {
-        return `
-        <div class="conv-item" id="conv-item-${conv.id}">
-            <div class="conv-avatar-wrap">
-                <div class="conv-avatar conv-avatar-group">
-                    <md-icon>group</md-icon>
-                </div>
-            </div>
+        return `<div class="conv-item" id="conv-item-${conv.id}">
+            <div class="conv-avatar-wrap"><div class="conv-avatar conv-avatar-group">${icon('group')}</div></div>
             <div class="conv-info">
                 <div class="conv-name-row">
                     <span class="conv-name">${escapeHtml(conv.display_name || conv.name || '群聊')}</span>
@@ -1589,13 +1352,10 @@ function renderConvItem(conv) {
             </div>
         </div>`;
     }
-
-    return `
-    <div class="conv-item" id="conv-item-${conv.id}">
+    return `<div class="conv-item" id="conv-item-${conv.id}">
         <div class="conv-avatar-wrap">
-            <img src="${conv.display_avatar || '/uploads/avatars/default.svg'}" 
-                 class="conv-avatar"
-                 onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="24" fill="#e0e0e0"/><text x="24" y="30" text-anchor="middle" font-size="18" fill="#999">' + (conv.display_name || '?')[0] + '</text></svg>')}'">
+            <img src="${avatarSrc(conv.display_avatar)}" class="conv-avatar"
+                 onerror="${avatarOnerror(conv.display_name)}">
         </div>
         <div class="conv-info">
             <div class="conv-name-row">
@@ -1611,46 +1371,23 @@ function renderConvItem(conv) {
 }
 
 async function loadConversations() {
-    try {
-        const data = await api('GET', '/conversations');
-        state.conversations = data.list || [];
-    } catch (e) {
-        console.error('加载会话失败:', e);
-        state.conversations = [];
-    }
+    const data = await api('GET', '/conversations');
+    state.conversations = data.list || [];
 }
 
-/**
- * 页面 B - 聊天详情
- */
 async function renderConversationDetail(convId) {
     const conv = state.conversations.find(c => c.id === convId);
-
-    // 如果会话不在本地列表中（例如从私聊按钮直接创建后跳转），尝试从 API 加载
     if (!conv) {
-        try {
-            await loadConversations();
-            // 重新查找
-            const found = state.conversations.find(c => c.id === convId);
-            if (found) {
-                return renderConversationDetail(convId); // 递归，这次能找到了
-            }
-        } catch (_) {}
-        // 仍然没找到，用 convId 继续渲染，显示默认名称
+        try { await loadConversations(); const found = state.conversations.find(c => c.id === convId); if (found) return renderConversationDetail(convId); } catch (_) {}
     }
-
-    const displayName = conv
-        ? (conv.display_name || (conv.other_user?.nickname || conv.other_user?.username || '聊天'))
-        : '聊天';
+    const displayName = conv ? (conv.display_name || (conv.other_user?.nickname || conv.other_user?.username || '聊天')) : '聊天';
     const messages = state.conversationMessages[convId] || [];
     state.currentConvType = conv?.type || 'private';
 
     dom.main.innerHTML = `
         <div class="chat-detail">
             <div class="chat-detail-header">
-                <md-icon-button id="btn-back-to-conv">
-                    <md-icon>arrow_back</md-icon>
-                </md-icon-button>
+                <button class="btn-icon" id="btn-back-to-conv">${icon('arrow_back')}</button>
                 <span class="chat-detail-title">${escapeHtml(displayName)}</span>
             </div>
             <div class="chat-messages" id="chat-messages">
@@ -1658,30 +1395,16 @@ async function renderConversationDetail(convId) {
                 ${messages.map(m => renderChatMessage(m)).join('\n')}
             </div>
             <div class="chat-input-bar">
-                <md-icon-button id="btn-chat-image" title="发送图片">
-                    <md-icon>add_photo_alternate</md-icon>
-                </md-icon-button>
+                <button class="btn-icon" id="btn-chat-image" title="发送图片">${icon('add_photo_alternate')}</button>
                 <input type="file" id="chat-image-input" accept="image/*" style="display:none">
-                ${state.currentConvType === 'group' ? `
-                <md-icon-button id="btn-chat-invite" title="邀请成员">
-                    <md-icon>person_add</md-icon>
-                </md-icon-button>` : ''}
+                ${state.currentConvType === 'group' ? `<button class="btn-icon" id="btn-chat-invite" title="邀请成员">${icon('person_add')}</button>` : ''}
                 <textarea id="chat-input" placeholder="输入消息..." rows="1" maxlength="5000"></textarea>
-                <md-filled-button id="btn-chat-send">
-                    <md-icon slot="icon">send</md-icon>
-                    发送
-                </md-filled-button>
+                <button class="btn-primary" id="btn-chat-send">${icon('send')} 发送</button>
             </div>
-        </div>
-    `;
+        </div>`;
 
-    // 返回按钮
-    $('#btn-back-to-conv')?.addEventListener('click', () => {
-        stopPolling(convId);
-        navigateTo('messages');
-    });
+    $('#btn-back-to-conv')?.addEventListener('click', () => { stopPolling(convId); navigateTo('messages'); });
 
-    // 发送消息
     const chatInput = $('#chat-input');
     const chatSend = $('#btn-chat-send');
 
@@ -1691,131 +1414,71 @@ async function renderConversationDetail(convId) {
         chatInput.value = '';
         chatInput.style.height = 'auto';
         try {
-            // 乐观更新
             const tempMsg = {
-                id: Date.now(),
-                user_id: state.user.id,
-                content: content,
+                id: Date.now(), user_id: state.user.id, content,
                 created_at: new Date().toISOString().replace('T', ' ').slice(0, 19),
-                nickname: state.user.nickname,
-                username: state.user.username,
-                avatar: state.user.avatar,
-                _pending: true,
+                nickname: state.user.nickname, username: state.user.username, avatar: state.user.avatar, _pending: true,
             };
-            if (!state.conversationMessages[convId]) {
-                state.conversationMessages[convId] = [];
-            }
+            if (!state.conversationMessages[convId]) state.conversationMessages[convId] = [];
             state.conversationMessages[convId].push(tempMsg);
             appendChatMessage(tempMsg);
             scrollChatToBottom();
-
             const result = await api('POST', `/conversations/${convId}/messages`, { content });
-            // 替换临时消息
             const msgs = state.conversationMessages[convId];
             const idx = msgs.findIndex(m => m._pending && m.id === tempMsg.id);
-            if (idx !== -1) {
-                msgs[idx] = result;
-            }
+            if (idx !== -1) msgs[idx] = result;
             const msgEl = document.getElementById(`msg-${tempMsg.id}`);
-            if (msgEl) {
-                msgEl.outerHTML = renderChatMessage(result);
-            }
-        } catch (e) {
-            showToast('发送失败: ' + e.message);
-        }
+            if (msgEl) msgEl.outerHTML = renderChatMessage(result);
+        } catch (e) { showToast('发送失败: ' + e.message); }
     }
 
     chatSend?.addEventListener('click', doSend);
-    chatInput?.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            doSend();
-        }
-    });
+    chatInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); } });
+    chatInput?.addEventListener('input', () => { chatInput.style.height = 'auto'; chatInput.style.height = Math.min(chatInput.scrollHeight, 100) + 'px'; });
 
-    // 自动调整输入框高度
-    chatInput?.addEventListener('input', () => {
-        chatInput.style.height = 'auto';
-        chatInput.style.height = Math.min(chatInput.scrollHeight, 100) + 'px';
-    });
-
-    // 图片按钮 - 选择图片
     const chatImageBtn = $('#btn-chat-image');
     const chatImageInput = $('#chat-image-input');
-    chatImageBtn?.addEventListener('click', () => {
-        chatImageInput.click();
-    });
+    chatImageBtn?.addEventListener('click', () => chatImageInput.click());
     chatImageInput?.addEventListener('change', async () => {
         const file = chatImageInput.files?.[0];
         if (!file) return;
-
         const formData = new FormData();
         formData.append('image', file);
-
         try {
-            // 上传图片获取 URL
             const uploadResult = await api('POST', '/upload/image', formData);
             const imageUrl = uploadResult.url;
-
-            // 作为图片消息发送
-            const content = imageUrl;
-            chatInput.value = '';
-            chatInput.style.height = 'auto';
-
             const tempMsg = {
-                id: Date.now(),
-                user_id: state.user.id,
-                content: content,
+                id: Date.now(), user_id: state.user.id, content: imageUrl,
                 created_at: new Date().toISOString().replace('T', ' ').slice(0, 19),
-                nickname: state.user.nickname,
-                username: state.user.username,
-                avatar: state.user.avatar,
-                _pending: true,
+                nickname: state.user.nickname, username: state.user.username, avatar: state.user.avatar, _pending: true,
             };
-            if (!state.conversationMessages[convId]) {
-                state.conversationMessages[convId] = [];
-            }
+            if (!state.conversationMessages[convId]) state.conversationMessages[convId] = [];
             state.conversationMessages[convId].push(tempMsg);
             appendChatMessage(tempMsg);
             scrollChatToBottom();
-
-            const result = await api('POST', `/conversations/${convId}/messages`, { content });
+            const result = await api('POST', `/conversations/${convId}/messages`, { content: imageUrl });
             const msgs = state.conversationMessages[convId];
             const idx = msgs.findIndex(m => m._pending && m.id === tempMsg.id);
-            if (idx !== -1) {
-                msgs[idx] = result;
-            }
+            if (idx !== -1) msgs[idx] = result;
             const msgEl = document.getElementById(`msg-${tempMsg.id}`);
-            if (msgEl) {
-                msgEl.outerHTML = renderChatMessage(result);
-            }
-        } catch (e) {
-            showToast('图片发送失败: ' + e.message);
-        }
-
+            if (msgEl) msgEl.outerHTML = renderChatMessage(result);
+        } catch (e) { showToast('图片发送失败: ' + e.message); }
         chatImageInput.value = '';
     });
 
-    // 邀请按钮 - 拉人进群
-    $('#btn-chat-invite')?.addEventListener('click', async () => {
-        await showInviteDialog(convId);
-    });
+    $('#btn-chat-invite')?.addEventListener('click', async () => { await showInviteDialog(convId); });
 
-    // 点击消息中的用户头像 → 跳转个人主页
     if (state.currentConvType === 'group') {
         const msgContainer = $('#chat-messages');
         msgContainer?.addEventListener('click', (e) => {
             const avatar = e.target.closest('.chat-msg-avatar');
             if (avatar) {
                 const userId = parseInt(avatar.dataset.userId);
-                if (userId && userId !== state.user?.id) {
-                    navigateToUserProfile(userId);
-                }
+                if (userId && userId !== state.user?.id) navigateToUserProfile(userId);
             }
         });
     }
 
-    // 加载历史消息（第一次进入时加载全部）
     if (!state.conversationMessages[convId] || state.conversationMessages[convId].length === 0) {
         try {
             const data = await api('GET', `/conversations/${convId}/messages?since_id=0`);
@@ -1827,17 +1490,10 @@ async function renderConversationDetail(convId) {
                     : state.conversationMessages[convId].map(m => renderChatMessage(m)).join('\n');
             }
             scrollChatToBottom();
-        } catch (e) {
-            console.error('加载消息失败:', e);
-        }
+        } catch (e) { console.error('加载消息失败:', e); }
     }
 
-    // 标记已读
-    try {
-        await api('POST', `/conversations/${convId}/read`);
-    } catch (_) {}
-
-    // 开始轮询
+    try { await api('POST', `/conversations/${convId}/read`); } catch (_) {}
     startPolling(convId);
 }
 
@@ -1845,58 +1501,33 @@ function renderChatMessage(msg) {
     const isSelf = parseInt(msg.user_id) === state.user?.id;
     const isGroup = state.currentConvType === 'group';
     const time = msg.created_at ? formatChatTime(msg.created_at) : '';
-    const pendingClass = msg._pending ? ' style="opacity:0.5;"' : '';
-
-    let contentHtml;
+    const pendingStyle = msg._pending ? ' style="opacity:0.5;"' : '';
     const content = msg.content || '';
-    // 检测是否为图片 URL
-    const isImage = /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(content)
-        && (content.startsWith('http://') || content.startsWith('https://') || content.startsWith('/'));
-    if (isImage) {
-        contentHtml = `<img src="${content}" alt="图片" class="chat-msg-image" style="cursor:pointer">`;
-    } else {
-        contentHtml = `<div>${escapeHtml(content)}</div>`;
-    }
+    const isImage = /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(content) && (content.startsWith('http://') || content.startsWith('https://') || content.startsWith('/'));
+    const contentHtml = isImage ? `<img src="${content}" alt="图片" class="chat-msg-image" style="cursor:pointer">` : `<div>${renderTextWithLinks(content)}</div>`;
 
     if (isGroup) {
-        const avatarUrl = msg.avatar || '/uploads/avatars/default.svg';
+        const avatarUrl = avatarSrc(msg.avatar);
         const displayName = msg.nickname || msg.username || '用户';
         if (isSelf) {
-            return `
-            <div class="chat-msg-row self group" id="msg-${msg.id}"${pendingClass}>
-                <div class="chat-msg-bubble">
-                    ${contentHtml}
-                    <div class="chat-msg-time">${escapeHtml(time)}</div>
-                </div>
-            </div>`;
-        } else {
-            return `
-            <div class="chat-msg-row other group" id="msg-${msg.id}"${pendingClass}>
-                <img src="${avatarUrl}" alt="" class="chat-msg-avatar" data-user-id="${msg.user_id}" style="cursor:pointer" onerror="this.src='/uploads/avatars/default.svg'">
-                <div>
-                    <div class="chat-msg-name">${escapeHtml(displayName)}</div>
-                    <div class="chat-msg-bubble">
-                        ${contentHtml}
-                        <div class="chat-msg-time">${escapeHtml(time)}</div>
-                    </div>
-                </div>
+            return `<div class="chat-msg-row self group" id="msg-${msg.id}"${pendingStyle}>
+                <div class="chat-msg-bubble">${contentHtml}<div class="chat-msg-time">${escapeHtml(time)}</div></div>
             </div>`;
         }
+        return `<div class="chat-msg-row other group" id="msg-${msg.id}"${pendingStyle}>
+            <img src="${avatarUrl}" alt="" class="chat-msg-avatar" data-user-id="${msg.user_id}" style="cursor:pointer" onerror="${avatarOnerror(msg.nickname || msg.username)}">
+            <div><div class="chat-msg-name">${escapeHtml(displayName)}</div>
+            <div class="chat-msg-bubble">${contentHtml}<div class="chat-msg-time">${escapeHtml(time)}</div></div></div>
+        </div>`;
     }
-
-    return `
-    <div class="chat-msg-row ${isSelf ? 'self' : 'other'}" id="msg-${msg.id}"${pendingClass}>
-        <div class="chat-msg-bubble">
-            ${contentHtml}
-            <div class="chat-msg-time">${escapeHtml(time)}</div>
-        </div>
+    return `<div class="chat-msg-row ${isSelf ? 'self' : 'other'}" id="msg-${msg.id}"${pendingStyle}>
+        <div class="chat-msg-bubble">${contentHtml}<div class="chat-msg-time">${escapeHtml(time)}</div></div>
     </div>`;
 }
 
 function appendChatMessage(msg) {
     const container = $('#chat-messages');
     if (!container) return;
-    // 移除 "暂无消息" 提示
     const empty = container.querySelector('.end-indicator');
     if (empty) empty.remove();
     container.insertAdjacentHTML('beforeend', renderChatMessage(msg));
@@ -1904,407 +1535,177 @@ function appendChatMessage(msg) {
 
 function scrollChatToBottom() {
     const container = $('#chat-messages');
-    if (container) {
-        container.scrollTop = container.scrollHeight;
-    }
+    if (container) container.scrollTop = container.scrollHeight;
 }
 
-/**
- * 轮询新消息
- */
 function startPolling(convId) {
-    stopPolling(convId); // 先停止旧的
-
+    stopPolling(convId);
     const timer = setInterval(async () => {
+        if (document.hidden) return;
         const msgs = state.conversationMessages[convId] || [];
         const lastId = msgs.length > 0 ? Math.max(...msgs.filter(m => !m._pending).map(m => m.id)) : 0;
-
         try {
             const data = await api('GET', `/conversations/${convId}/messages?since_id=${lastId}`);
             const newMsgs = data.messages || [];
             if (newMsgs.length === 0) return;
-
-            if (!state.conversationMessages[convId]) {
-                state.conversationMessages[convId] = [];
-            }
-
-            // 去重，避免重复追加
+            if (!state.conversationMessages[convId]) state.conversationMessages[convId] = [];
             const existingIds = new Set(state.conversationMessages[convId].map(m => m.id));
             const toAdd = newMsgs.filter(m => !existingIds.has(m.id));
-
             if (toAdd.length === 0) return;
-
             state.conversationMessages[convId].push(...toAdd);
             toAdd.forEach(m => appendChatMessage(m));
-
-            // 如果正在查看该会话则标记已读
             if (state.currentPage === 'chat' && state.currentConvId === convId) {
                 scrollChatToBottom();
-                try {
-                    await api('POST', `/conversations/${convId}/read`);
-                } catch (_) {}
+                try { await api('POST', `/conversations/${convId}/read`); } catch (_) {}
             }
-
-            // 同时刷新会话列表的未读数
             updateConvUnreadBadge();
-        } catch (e) {
-            console.error('轮询消息失败:', e);
-        }
+        } catch (e) { console.error('轮询消息失败:', e); }
     }, 3000);
-
     state.pollingTimers[convId] = timer;
 }
 
 function stopPolling(convId) {
-    if (state.pollingTimers[convId]) {
-        clearInterval(state.pollingTimers[convId]);
-        delete state.pollingTimers[convId];
-    }
+    if (state.pollingTimers[convId]) { clearInterval(state.pollingTimers[convId]); delete state.pollingTimers[convId]; }
 }
+function stopAllPolling() { Object.keys(state.pollingTimers).forEach(convId => stopPolling(parseInt(convId))); }
 
-function stopAllPolling() {
-    Object.keys(state.pollingTimers).forEach(convId => stopPolling(parseInt(convId)));
-}
-
-/**
- * 创建群聊对话框
- */
 async function openCreateGroupDialog() {
     if (!state.user) return;
-
-    // 加载用户列表 — 只显示和自己有私聊的用户
     try {
-        // 确保会话列表已加载
-        if (!state.conversations || state.conversations.length === 0) {
-            await loadConversations();
-        }
-
-        // 从私聊中提取对方用户
+        if (!state.conversations || state.conversations.length === 0) await loadConversations();
         const userMap = new Map();
         for (const conv of state.conversations) {
             if (conv.type === 'private' && conv.other_user && conv.other_user.id !== state.user.id) {
                 const u = conv.other_user;
-                if (!userMap.has(u.id)) {
-                    userMap.set(u.id, {
-                        id: u.id,
-                        nickname: u.nickname || u.username,
-                        username: u.username,
-                        avatar: u.avatar,
-                    });
-                }
+                if (!userMap.has(u.id)) userMap.set(u.id, { id: u.id, nickname: u.nickname || u.username, username: u.username, avatar: u.avatar });
             }
         }
-
         const allUsers = Array.from(userMap.values());
-
         dom.groupMemberList.innerHTML = allUsers.length === 0
             ? '<div class="end-indicator">暂无私聊用户</div>'
-            : allUsers.map(u => `
-                <label class="group-member-item">
-                    <img src="${u.avatar || '/uploads/avatars/default.svg'}"
-                         onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#e0e0e0"/><text x="18" y="24" text-anchor="middle" font-size="16" fill="#999">' + (u.nickname || u.username)[0] + '</text></svg>')}'">
-                    <span class="member-name">${escapeHtml(u.nickname || u.username)}</span>
-                    <md-checkbox touch-target="wrapper" data-user-id="${u.id}"></md-checkbox>
-                </label>
-            `).join('');
-
-        dialogOpen(dom.createGroupDialog);
-    } catch (e) {
-        showToast('加载用户列表失败: ' + e.message);
-    }
+            : allUsers.map(u => `<label class="group-member-item">
+                <img src="${avatarSrc(u.avatar)}" onerror="${avatarOnerror(u.nickname || u.username)}">
+                <span class="member-name">${escapeHtml(u.nickname || u.username)}</span>
+                <input type="checkbox" class="ba-checkbox" data-user-id="${u.id}">
+            </label>`).join('');
+        dialogOpen(dom.createGroupOverlay);
+    } catch (e) { showToast('加载用户列表失败: ' + e.message); }
 }
 
-// 创建群聊 - 提交
 dom.createGroupSubmit?.addEventListener('click', async () => {
     const name = dom.groupNameInput.value.trim();
-    if (!name) {
-        dom.groupMemberError.textContent = '请输入群聊名称';
-        dom.groupMemberError.style.display = 'block';
-        return;
-    }
-
-    const allCheckboxes = dom.groupMemberList.querySelectorAll('md-checkbox');
-    const checkedBoxes = Array.from(allCheckboxes).filter(cb => cb.checked);
-    const userIds = checkedBoxes.map(cb => parseInt(cb.dataset.userId));
-
-    if (userIds.length === 0) {
-        dom.groupMemberError.textContent = '请至少选择一位成员';
-        dom.groupMemberError.style.display = 'block';
-        return;
-    }
-
+    if (!name) { dom.groupMemberError.textContent = '请输入群聊名称'; dom.groupMemberError.style.display = 'block'; return; }
+    const userIds = Array.from(dom.groupMemberList.querySelectorAll('.ba-checkbox:checked')).map(cb => parseInt(cb.dataset.userId));
+    if (userIds.length === 0) { dom.groupMemberError.textContent = '请至少选择一位成员'; dom.groupMemberError.style.display = 'block'; return; }
     dom.groupMemberError.style.display = 'none';
-
     try {
-        const result = await api('POST', '/conversations', {
-            type: 'group',
-            name,
-            user_ids: userIds,
-        });
-        dialogClose(dom.createGroupDialog);
+        const result = await api('POST', '/conversations', { type: 'group', name, user_ids: userIds });
+        dialogClose(dom.createGroupOverlay);
         dom.groupNameInput.value = '';
         showToast('群聊创建成功');
         state.currentConvId = result.id;
         navigateTo('chat');
-    } catch (e) {
-        dom.groupMemberError.textContent = e.message;
-        dom.groupMemberError.style.display = 'block';
-    }
+    } catch (e) { dom.groupMemberError.textContent = e.message; dom.groupMemberError.style.display = 'block'; }
 });
 
 dom.createGroupCancel?.addEventListener('click', () => {
-    dialogClose(dom.createGroupDialog);
+    dialogClose(dom.createGroupOverlay);
     dom.groupNameInput.value = '';
     dom.groupMemberError.style.display = 'none';
 });
 
-/**
- * 显示群信息对话框（成员列表）
- */
-async function showGroupInfoDialog(convId) {
-    if (!state.user) return;
-
-    try {
-        const data = await api('GET', `/conversations/${convId}/members`);
-        const members = data.members || [];
-
-        // 创建对话框
-        const dialog = document.createElement('md-dialog');
-        dialog.id = 'group-info-dialog';
-
-        const memberHtml = members.map(m => `
-            <div class="group-member-item" style="cursor:pointer" data-user-id="${m.id}">
-                <img src="${m.avatar || '/uploads/avatars/default.svg'}"
-                     onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#e0e0e0"/><text x="18" y="24" text-anchor="middle" font-size="16" fill="#999">' + (m.nickname || m.username)[0] + '</text></svg>')}'">
-                <span class="member-name">${escapeHtml(m.nickname || m.username)}</span>
-            </div>
-        `).join('');
-
-        dialog.innerHTML = `
-            <div slot="headline">群成员 (${members.length}人)</div>
-            <div slot="content" style="min-width:280px;">
-                ${memberHtml || '<div class="end-indicator">暂无成员</div>'}
-            </div>
-            <div slot="actions">
-                <md-text-button id="group-info-close">关闭</md-text-button>
-            </div>
-        `;
-
-        document.body.appendChild(dialog);
-
-        // 成员点击 - 进入个人主页
-        dialog.addEventListener('click', (e) => {
-            const item = e.target.closest('.group-member-item');
-            if (item) {
-                const userId = parseInt(item.dataset.userId);
-                if (userId && userId !== state.user?.id) {
-                    dialogClose(dialog);
-                    dialog.remove();
-                    navigateToUserProfile(userId);
-                }
-            }
-        });
-
-        dialog.querySelector('#group-info-close')?.addEventListener('click', () => {
-            dialogClose(dialog);
-            dialog.remove();
-        });
-
-        dialog.addEventListener('close', () => {
-            dialog.remove();
-        });
-
-        dialogOpen(dialog);
-    } catch (e) {
-        showToast('加载群信息失败: ' + e.message);
-    }
-}
-
-/**
- * 显示邀请成员对话框（拉人进群）
- */
 async function showInviteDialog(convId) {
     if (!state.user) return;
-
     try {
-        // 先获取现有成员
         const memberData = await api('GET', `/conversations/${convId}/members`);
         const existingIds = new Set((memberData.members || []).map(m => m.id));
-
-        // 获取可选用户列表 — 从私聊中提取
-        if (!state.conversations || state.conversations.length === 0) {
-            await loadConversations();
-        }
-
+        if (!state.conversations || state.conversations.length === 0) await loadConversations();
         const userMap = new Map();
         for (const conv of state.conversations) {
             if (conv.type === 'private' && conv.other_user && conv.other_user.id !== state.user.id) {
                 const u = conv.other_user;
-                if (!userMap.has(u.id)) {
-                    userMap.set(u.id, {
-                        id: u.id,
-                        nickname: u.nickname || u.username,
-                        username: u.username,
-                        avatar: u.avatar,
-                    });
-                }
+                if (!userMap.has(u.id)) userMap.set(u.id, { id: u.id, nickname: u.nickname || u.username, username: u.username, avatar: u.avatar });
             }
         }
-
-        // 过滤掉已在群中的用户
         const allUsers = Array.from(userMap.values()).filter(u => !existingIds.has(u.id));
-
-        // 创建对话框
-        const dialog = document.createElement('md-dialog');
-        dialog.id = 'invite-dialog';
-
-        dialog.innerHTML = `
-            <div slot="headline">邀请成员</div>
-            <div slot="content" style="min-width:300px;">
+        const dialogOverlay = document.createElement('div');
+        dialogOverlay.className = 'modal-overlay';
+        dialogOverlay.innerHTML = `<div class="modal">
+            <div class="modal-headline">邀请成员</div>
+            <div class="modal-content">
                 <div id="invite-member-list" class="group-member-list">
-                    ${allUsers.length === 0
-                        ? '<div class="end-indicator">没有可邀请的用户</div>'
-                        : allUsers.map(u => `
-                            <label class="group-member-item">
-                                <img src="${u.avatar || '/uploads/avatars/default.svg'}"
-                                     onerror="this.src='data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#e0e0e0"/><text x="18" y="24" text-anchor="middle" font-size="16" fill="#999">' + (u.nickname || u.username)[0] + '</text></svg>')}'">
-                                <span class="member-name">${escapeHtml(u.nickname || u.username)}</span>
-                                <md-checkbox touch-target="wrapper" data-user-id="${u.id}"></md-checkbox>
-                            </label>
-                        `).join('')}
+                    ${allUsers.length === 0 ? '<div class="end-indicator">没有可邀请的用户</div>'
+                        : allUsers.map(u => `<label class="group-member-item">
+                            <img src="${avatarSrc(u.avatar)}" onerror="${avatarOnerror(u.nickname || u.username)}">
+                            <span class="member-name">${escapeHtml(u.nickname || u.username)}</span>
+                            <input type="checkbox" class="ba-checkbox" data-user-id="${u.id}">
+                        </label>`).join('')}
                 </div>
                 <div id="invite-error" class="error-message" style="display:none"></div>
             </div>
-            <div slot="actions">
-                <md-text-button id="invite-cancel">取消</md-text-button>
-                <md-filled-button id="invite-submit">邀请</md-filled-button>
+            <div class="modal-actions">
+                <button class="btn-text" id="invite-cancel">取消</button>
+                <button class="btn-primary" id="invite-submit">邀请</button>
             </div>
-        `;
-
-        document.body.appendChild(dialog);
-
-        dialog.querySelector('#invite-cancel')?.addEventListener('click', () => {
-            dialogClose(dialog);
-            dialog.remove();
+        </div>`;
+        document.body.appendChild(dialogOverlay);
+        dialogOverlay.querySelector('#invite-cancel')?.addEventListener('click', () => { dialogClose(dialogOverlay); dialogOverlay.remove(); });
+        dialogOverlay.querySelector('#invite-submit')?.addEventListener('click', async () => {
+            const userIds = Array.from(dialogOverlay.querySelectorAll('#invite-member-list .ba-checkbox:checked')).map(cb => parseInt(cb.dataset.userId));
+            if (userIds.length === 0) { dialogOverlay.querySelector('#invite-error').textContent = '请至少选择一位用户'; dialogOverlay.querySelector('#invite-error').style.display = 'block'; return; }
+            dialogOverlay.querySelector('#invite-error').style.display = 'none';
+            try { await api('POST', `/conversations/${convId}/members`, { user_ids: userIds }); dialogClose(dialogOverlay); dialogOverlay.remove(); showToast('邀请成功'); await loadConversations(); }
+            catch (e) { dialogOverlay.querySelector('#invite-error').textContent = e.message; dialogOverlay.querySelector('#invite-error').style.display = 'block'; }
         });
-
-        dialog.querySelector('#invite-submit')?.addEventListener('click', async () => {
-            const allCheckboxes = dialog.querySelectorAll('#invite-member-list md-checkbox');
-            const checkedBoxes = Array.from(allCheckboxes).filter(cb => cb.checked);
-            const userIds = checkedBoxes.map(cb => parseInt(cb.dataset.userId));
-
-            if (userIds.length === 0) {
-                dialog.querySelector('#invite-error').textContent = '请至少选择一位用户';
-                dialog.querySelector('#invite-error').style.display = 'block';
-                return;
-            }
-
-            dialog.querySelector('#invite-error').style.display = 'none';
-
-            try {
-                await api('POST', `/conversations/${convId}/members`, { user_ids: userIds });
-                dialogClose(dialog);
-                dialog.remove();
-                showToast('邀请成功');
-                // 刷新会话列表（更新成员信息）
-                await loadConversations();
-            } catch (e) {
-                dialog.querySelector('#invite-error').textContent = e.message;
-                dialog.querySelector('#invite-error').style.display = 'block';
-            }
-        });
-
-        dialog.addEventListener('close', () => {
-            dialog.remove();
-        });
-
-        dialogOpen(dialog);
-    } catch (e) {
-        showToast('加载用户列表失败: ' + e.message);
-    }
+        dialogOverlay.addEventListener('click', (e) => { if (e.target === dialogOverlay) { dialogClose(dialogOverlay); dialogOverlay.remove(); } });
+        dialogOpen(dialogOverlay);
+    } catch (e) { showToast('加载用户列表失败: ' + e.message); }
 }
 
-/**
- * 检查未读会话并更新 badge
- */
 async function checkUnreadConversations() {
     if (!state.user) return;
     try {
         const data = await api('GET', '/conversations/unread');
         const count = data.unread_count || 0;
-        const badge = dom.msgBadge;
-        if (count > 0) {
-            badge.textContent = count > 99 ? '99+' : count;
-            badge.style.display = '';
-        } else {
-            badge.style.display = 'none';
-        }
+        if (count > 0) { dom.msgBadge.textContent = count > 99 ? '99+' : count; dom.msgBadge.style.display = ''; }
+        else { dom.msgBadge.style.display = 'none'; }
     } catch (_) {}
 }
 
 function updateConvUnreadBadge() {
     const totalUnread = state.conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0);
-    const badge = dom.msgBadge;
-    if (totalUnread > 0) {
-        badge.textContent = totalUnread > 99 ? '99+' : totalUnread;
-        badge.style.display = '';
-    } else {
-        badge.style.display = 'none';
-    }
+    if (totalUnread > 0) { dom.msgBadge.textContent = totalUnread > 99 ? '99+' : totalUnread; dom.msgBadge.style.display = ''; }
+    else { dom.msgBadge.style.display = 'none'; }
 }
 
-/**
- * 格式化为简短时间（用于会话列表）
- */
+// ===== Utilities =====
 function formatTimeShort(dateStr) {
     if (!dateStr) return '';
     const d = new Date(dateStr.replace(' ', 'T') + 'Z');
-    const now = new Date();
-    const diff = (now - d) / 1000;
-
+    const diff = (new Date() - d) / 1000;
     if (diff < 60) return '刚刚';
     if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
-    if (diff < 86400) {
-        const h = d.getHours().toString().padStart(2, '0');
-        const m = d.getMinutes().toString().padStart(2, '0');
-        return `${h}:${m}`;
-    }
+    if (diff < 86400) return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
     if (diff < 172800) return '昨天';
     if (diff < 2592000) return `${Math.floor(diff / 86400)}天前`;
-
-    const y = d.getFullYear();
-    const mo = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${mo}-${day}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-/**
- * 格式化为聊天时间（用于消息气泡）
- */
 function formatChatTime(dateStr) {
     if (!dateStr) return '';
     const d = new Date(dateStr.replace(' ', 'T') + 'Z');
-    const h = d.getHours().toString().padStart(2, '0');
-    const m = d.getMinutes().toString().padStart(2, '0');
-    return `${h}:${m}`;
+    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
 }
 
-// ===== 工具函数 =====
 function formatTime(dateStr) {
     if (!dateStr) return '';
     const d = new Date(dateStr.replace(' ', 'T') + 'Z');
-    const now = new Date();
-    const diff = (now - d) / 1000;
-
+    const diff = (new Date() - d) / 1000;
     if (diff < 60) return '刚刚';
     if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
     if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;
     if (diff < 2592000) return `${Math.floor(diff / 86400)} 天前`;
-
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function escapeHtml(str) {
@@ -2314,96 +1715,60 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
-// ===== 初始化 =====
-async function init() {
-    // 检查登录状态
-    try {
-        const user = await api('GET', '/user/me');
-        state.user = user;
-    } catch (_) {
-        state.user = null;
-    }
-    updateAuthUI();
-
-    // 渲染主页
-    await renderHome();
-
-    // 检查 hash 定位到指定动态
-    const hash = window.location.hash.slice(1);
-    if (hash && /^\d+$/.test(hash)) {
-        await scrollToPost(hash);
-    }
-
-    // 定时检查未读通知
-    if (state.user) {
-        await checkUnread();
-        setInterval(checkUnread, 30000);
-        // 检查未读会话
-        await checkUnreadConversations();
-        setInterval(checkUnreadConversations, 30000);
-    }
-
-    // ===== 深色/浅色模式切换（支持设备系统自动适配） =====
-    const themeToggle = dom.btnThemeToggle;
-    const themeIcon = themeToggle.querySelector('md-icon');
-
-    /** 获取当前应使用的主题：优先使用用户手动保存的，否则跟随系统 */
-    function getEffectiveTheme() {
-        const saved = localStorage.getItem('crmoment-theme');
-        if (saved === 'dark' || saved === 'light') return saved;
-        // 没有保存过 → 跟随系统
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-
-    /** 应用主题到页面 */
-    function applyTheme(theme) {
-        document.documentElement.setAttribute('data-theme', theme);
-        themeIcon.textContent = theme === 'dark' ? 'dark_mode' : 'light_mode';
-    }
-
-    // 初始化主题
-    applyTheme(getEffectiveTheme());
-
-    // 用户手动切换
-    themeToggle.addEventListener('click', () => {
-        const current = document.documentElement.getAttribute('data-theme');
-        const next = current === 'dark' ? 'light' : 'dark';
-        applyTheme(next);
-        localStorage.setItem('crmoment-theme', next);
+function renderTextWithLinks(text) {
+    if (!text) return '';
+    const htmlBlocks = [];
+    const placeholderPrefix = '%%HTMLBLOCK_';
+    const textWithPlaceholders = text.replace(/\[htmltext\]([\s\S]*?)\[\/htmltext\]/g, (match, content) => {
+        const idx = htmlBlocks.length;
+        htmlBlocks.push(content);
+        return placeholderPrefix + idx + '%%';
     });
-
-    // 监听系统主题变化（设备自动切换深色/浅色时实时响应）
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-        // 仅当用户没有手动存储过偏好时才跟随系统
-        const saved = localStorage.getItem('crmoment-theme');
-        if (saved !== 'dark' && saved !== 'light') {
-            applyTheme(e.matches ? 'dark' : 'light');
-        }
-    });
-
-    // 添加音乐对话框事件
-    dom.addMusicSubmit?.addEventListener('click', handleAddMusic);
-    dom.addMusicCancel?.addEventListener('click', () => dialogClose(dom.addMusicDialog));
-    // 回车提交
-    dom.addMusicDialog?.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleAddMusic();
-        }
-    });
-    // 搜索音乐对话框事件
-    $('#search-music-submit')?.addEventListener('click', handleSearchSubmit);
-    $('#search-music-cancel')?.addEventListener('click', () => dialogClose($('#search-music-dialog')));
-    $('#search-music-clear')?.addEventListener('click', handleSearchClear);
-    $('#music-search')?.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') handleSearchSubmit();
-    });
-
-    console.log('CRMoment Web App 已启动');
-
-    // 修复按钮间距（在 DOM 填充完毕后执行）
-    setupPadObserver();
+    const escaped = escapeHtml(textWithPlaceholders);
+    return escaped.replace(/\[link\]([^\[]+)\[text\]([^\[]+?)\[\/link\]/g, (match, url, buttonText) => {
+        return `<a href="${url.trim()}" target="_blank" rel="noopener noreferrer" class="inline-link-btn">${buttonText.trim()}</a>`;
+    }).replace(/%%HTMLBLOCK_(\d+)%%/g, (match, idx) => htmlBlocks[parseInt(idx)] || '');
 }
 
-// 等待 DOM 加载后初始化
+// ===== Scroll Reveal =====
+const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.classList.add('reveal');
+        } else {
+            entry.target.classList.remove('reveal');
+        }
+    });
+}, { threshold: 0.1 });
+
+function observeRevealElements() {
+    document.querySelectorAll('.post-card:not(.observed)').forEach(el => {
+        el.classList.add('observed');
+        revealObserver.observe(el);
+    });
+}
+
+// ===== Init =====
+async function init() {
+    try { const user = await api('GET', '/user/me'); state.user = user; } catch (_) { state.user = null; }
+    updateAuthUI();
+    await renderHome();
+    const hash = window.location.hash.slice(1);
+    if (hash && /^\d+$/.test(hash)) await scrollToPost(hash);
+    if (state.user) {
+        await checkUnread();
+        setInterval(() => { if (!document.hidden) checkUnread(); }, 30000);
+        await checkUnreadConversations();
+        setInterval(() => { if (!document.hidden) checkUnreadConversations(); }, 30000);
+    }
+    dom.addMusicSubmit?.addEventListener('click', handleAddMusic);
+    dom.addMusicCancel?.addEventListener('click', () => dialogClose(dom.addMusicOverlay));
+    dom.addMusicOverlay?.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddMusic(); } });
+    $('#search-music-submit')?.addEventListener('click', handleSearchSubmit);
+    $('#search-music-cancel')?.addEventListener('click', () => dialogClose($('#search-music-overlay')));
+    $('#search-music-clear')?.addEventListener('click', handleSearchClear);
+    $('#music-search')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSearchSubmit(); });
+    console.log('CRMoment Web App (BA Theme) 已启动');
+}
+
 document.addEventListener('DOMContentLoaded', init);

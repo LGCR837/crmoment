@@ -26,7 +26,7 @@ function handleMusicList(): void {
 
         // 获取列表（含作者信息）
         $stmt = $pdo->prepare(
-            'SELECT m.id, m.title, m.music_url, m.lrc_url, m.bg_url, m.lrc_pos, m.lrc_color, m.plays_count, m.created_at,
+            'SELECT m.id, m.title, m.music_url, m.lrc_url, m.bg_url, m.video_url, m.lrc_pos, m.lrc_color, m.plays_count, m.created_at,
                     u.id AS user_id, u.username, u.nickname, u.avatar
              FROM music m
              JOIN users u ON m.user_id = u.id
@@ -42,7 +42,7 @@ function handleMusicList(): void {
 
         // 获取列表（含作者信息）
         $stmt = $pdo->prepare(
-            'SELECT m.id, m.title, m.music_url, m.lrc_url, m.bg_url, m.lrc_pos, m.lrc_color, m.plays_count, m.created_at,
+            'SELECT m.id, m.title, m.music_url, m.lrc_url, m.bg_url, m.video_url, m.lrc_pos, m.lrc_color, m.plays_count, m.created_at,
                     u.id AS user_id, u.username, u.nickname, u.avatar
              FROM music m
              JOIN users u ON m.user_id = u.id
@@ -84,9 +84,10 @@ function handleMusicCreate(): void {
     $musicUrl = trim($body['music_url'] ?? '');
     $lrcUrl   = trim($body['lrc_url'] ?? '');
     $bgUrl    = trim($body['bg_url'] ?? '');
+    $videoUrl = trim($body['video_url'] ?? '');
     $lrcPos   = trim($body['lrc_pos'] ?? 'center');
     $lrcColor = trim($body['lrc_color'] ?? 'light');
-    if (!in_array($lrcPos, ['left', 'center', 'right'], true)) $lrcPos = 'center';
+    if (!in_array($lrcPos, ['left', 'center', 'right', 'none'], true)) $lrcPos = 'center';
     if (!in_array($lrcColor, ['light', 'dark'], true)) $lrcColor = 'light';
 
     if ($title === '') {
@@ -112,10 +113,10 @@ function handleMusicCreate(): void {
 
     $pdo = getDB();
     $stmt = $pdo->prepare(
-        'INSERT INTO music (user_id, title, music_url, lrc_url, bg_url, lrc_pos, lrc_color, plays_count, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0, NOW())'
+        'INSERT INTO music (user_id, title, music_url, lrc_url, bg_url, video_url, lrc_pos, lrc_color, plays_count, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NOW())'
     );
-    $stmt->execute([$userId, $title, $musicUrl, $lrcUrl, $bgUrl ?: null, $lrcPos, $lrcColor]);
+    $stmt->execute([$userId, $title, $musicUrl, $lrcUrl, $bgUrl ?: null, $videoUrl ?: null, $lrcPos, $lrcColor]);
     $musicId = (int)$pdo->lastInsertId();
 
     success([
@@ -156,9 +157,10 @@ function handleMusicUpdate(int $id): void {
     $musicUrl = trim($body['music_url'] ?? '');
     $lrcUrl   = trim($body['lrc_url'] ?? '');
     $bgUrl    = trim($body['bg_url'] ?? '');
+    $videoUrl = trim($body['video_url'] ?? '');
     $lrcPos   = trim($body['lrc_pos'] ?? 'center');
     $lrcColor = trim($body['lrc_color'] ?? 'light');
-    if (!in_array($lrcPos, ['left', 'center', 'right'], true)) $lrcPos = 'center';
+    if (!in_array($lrcPos, ['left', 'center', 'right', 'none'], true)) $lrcPos = 'center';
     if (!in_array($lrcColor, ['light', 'dark'], true)) $lrcColor = 'light';
 
     if ($title === '') {
@@ -195,9 +197,9 @@ function handleMusicUpdate(int $id): void {
     }
 
     $stmt = $pdo->prepare(
-        'UPDATE music SET title = ?, music_url = ?, lrc_url = ?, bg_url = ?, lrc_pos = ?, lrc_color = ? WHERE id = ?'
+        'UPDATE music SET title = ?, music_url = ?, lrc_url = ?, bg_url = ?, video_url = ?, lrc_pos = ?, lrc_color = ? WHERE id = ?'
     );
-    $stmt->execute([$title, $musicUrl, $lrcUrl, $bgUrl ?: null, $lrcPos, $lrcColor, $id]);
+    $stmt->execute([$title, $musicUrl, $lrcUrl, $bgUrl ?: null, $videoUrl ?: null, $lrcPos, $lrcColor, $id]);
 
     success([
         'id'    => $id,

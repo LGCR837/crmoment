@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS `music` (
     `music_url` VARCHAR(500) NOT NULL COMMENT '音频直链',
     `lrc_url` VARCHAR(500) DEFAULT NULL COMMENT '歌词文件直链',
     `bg_url` VARCHAR(500) DEFAULT NULL COMMENT '背景图片直链',
+    `video_url` VARCHAR(500) DEFAULT NULL COMMENT '背景视频直链',
     `lrc_pos` VARCHAR(10) DEFAULT 'center' COMMENT '歌词位置 left/center/right',
     `lrc_color` VARCHAR(10) DEFAULT 'light' COMMENT '歌词颜色 light/dark',
     `plays_count` INT UNSIGNED DEFAULT 0 COMMENT '播放量',
