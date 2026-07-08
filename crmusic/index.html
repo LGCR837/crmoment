@@ -156,6 +156,41 @@
 </div>
 
 <script src="plugns/layui/layui.js"></script>
+<script>
+// 针对带关闭动画的弹窗，延迟移除 shade/layer，避免黑屏闪烁
+(function() {
+    if (!window.layer) return;
+    var _close = window.layer.close;
+    window.layer.close = function(idx) {
+        var $layer = jQuery && jQuery('#layui-layer' + idx);
+        if ($layer && $layer.length && $layer.data('isOutAnim')) {
+            // 只添加关闭动画，不立即移除 shade/layer
+            $layer.addClass('layer-anim layer-anim-close');
+            var $shade = jQuery && jQuery('#layui-layer-shade' + idx);
+            if ($shade && $shade.length) {
+                $shade.addClass('is-out-anim');
+            }
+            setTimeout(function() {
+                if ($layer.length) {
+                    $layer[0].innerHTML = '';
+                    $layer.remove();
+                }
+                var $shade = jQuery && jQuery('#layui-layer-shade' + idx);
+                if ($shade && $shade.length) {
+                    $shade.remove();
+                }
+                var $moves = jQuery && jQuery('#layui-layer-moves');
+                if ($moves && $moves.length) {
+                    $moves.remove();
+                }
+                jQuery('html').removeAttr('layer-full');
+            }, 260);
+        } else {
+            _close.call(window.layer, idx);
+        }
+    };
+})();
+</script>
 <script src="js/player.js"></script>
 <script src="js/ajax.js"></script>
 <script src="js/lyric.js"></script>

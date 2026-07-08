@@ -1195,16 +1195,24 @@ class Meting
             $data['data'][0]['url'] = $data['data'][0]['uf']['url'];
         }
         if (isset($data['data'][0]['url'])) {
+            $fee   = isset($data['data'][0]['fee'])   ? (int)$data['data'][0]['fee']   : 0;
+            $payed = isset($data['data'][0]['payed']) ? (int)$data['data'][0]['payed'] : 0;
             $url = array(
-                'url'  => $data['data'][0]['url'],
-                'size' => $data['data'][0]['size'],
-                'br'   => $data['data'][0]['br'] / 1000,
+                'url'   => $data['data'][0]['url'],
+                'size'  => $data['data'][0]['size'],
+                'br'    => $data['data'][0]['br'] / 1000,
+                'fee'   => $fee,
+                'payed' => $payed,
+                'vip'   => ($fee == 1 && $payed == 0),
             );
         } else {
             $url = array(
-                'url'  => '',
-                'size' => 0,
-                'br'   => -1,
+                'url'   => '',
+                'size'  => 0,
+                'br'    => -1,
+                'fee'   => 0,
+                'payed' => 0,
+                'vip'   => false,
             );
         }
 

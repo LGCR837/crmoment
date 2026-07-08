@@ -72,6 +72,13 @@ $(function(){
             case "sheet":
                 dataBox("sheet");
             break;
+            case "search":
+                // 回到搜索状态
+                dataBox("list");
+                if(rem.wd && rem.wd.trim() !== '') {
+                    $(".btn[data-action='search']").show();
+                }
+            break;
         }
     });
     
@@ -140,6 +147,7 @@ $(function(){
     $clearBtn.on('click', function() {
         $searchInput.val('').focus();
         $(this).hide();
+        $(".btn[data-action='search']").hide();
     });
 
     // 列表项单击播放（整行点击）
@@ -676,6 +684,12 @@ function dataBox(choose) {
                 $(".btn[data-action='playing']").addClass('active');
             } else if(rem.dislist == 0) {
                 $(".btn[data-action='search']").addClass('active');
+            }
+            // 搜索模式下显示搜索按钮
+            if(rem.wd && rem.wd.trim() !== '') {
+                $(".btn[data-action='search']").show();
+            } else {
+                $(".btn[data-action='search']").hide();
             }
         break;
         case "sheet":

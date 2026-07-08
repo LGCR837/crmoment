@@ -65,6 +65,17 @@ switch($types)   // 根据请求的 Api，执行相应操作
         $id = getParam('id');  // 歌曲ID
         
         $data = $API->url($id);
+        $json = json_decode($data, true);
+        
+        // VIP 歌曲且未购买：走第三方完整音频接口
+        if (isset($json['vip']) && $json['vip'] === true) {
+            $br  = getParam('br', 192);
+            $url = 'https://music-api.gdstudio.xyz/api.php?types=url&source=netease&id=' . $id . '&br=' . $br;
+            $res = @file_get_contents($url);
+            if ($res !== false) {
+                $data = $res;
+            }
+        }
         
         echojson($data);
         break;

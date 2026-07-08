@@ -122,8 +122,7 @@ function audioPause() {
 
     // 静态标题：暂停时恢复默认
     document.title = "CRMusic Neo";
-    $("#now-playing-title").text("未在播放");
-    $("#now-playing-artist").text("");
+    // 暂停时不改变歌曲名和歌手，保持当前显示（同歌词行为）
 }
 
 function prevMusic() {
@@ -163,6 +162,18 @@ function updateProgress(){
 
 function listClick(no) {
     var tmpid = no;
+    
+    // 判断点击的歌曲是否正在播放，是则跳过
+    if(rem.playlist !== undefined && rem.playid !== undefined) {
+        var clickMusic = musicList[rem.dislist].item[no];
+        var playMusic = musicList[rem.playlist].item[rem.playid];
+        if(clickMusic && playMusic && clickMusic.id == playMusic.id && clickMusic.source == playMusic.source) {
+            if(mkPlayer.debug) {
+                console.log("歌曲正在播放，跳过：" + clickMusic.name);
+            }
+            return false;
+        }
+    }
     
     if(mkPlayer.debug) {
         console.log("点播了列表中的第 " + (no + 1) + " 首歌 " + musicList[rem.dislist].item[no].name);

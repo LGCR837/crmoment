@@ -92,6 +92,12 @@ body {
     overflow: hidden;
     z-index: 0;
 }
+#blur-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+}
 /* 移动端使用的模糊图像层 */
 #mobile-blur {
     -webkit-filter: blur(40px) saturate(1.2);
@@ -104,7 +110,7 @@ body {
     left: 0;
     z-index: 1;
     width: 100%;
-    background-size: auto 100%;
+    background-size: cover;
     background-position: center center;
     background-repeat: no-repeat;
 }
@@ -948,8 +954,14 @@ body {
 }
 .layui-layer-shade {
     background: rgba(0, 0, 0, 0.3) !important;
+    transition: opacity 0.25s ease !important;
+    opacity: 1;
 }
-/* 信息弹窗内容 */
+/* shade 同步淡出，与弹窗关闭动画保持一致 */
+.layui-layer-shade.is-out-anim {
+    opacity: 0;
+    transition: opacity 0.25s ease !important;
+}
 .info-title {
     color: #8a9db0;
     font-size: 13px;
