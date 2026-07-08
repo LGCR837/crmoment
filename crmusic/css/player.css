@@ -1,0 +1,980 @@
+@charset "utf-8";
+/**************************************************
+ * CRMusicNeo - Modernized Player Stylesheet
+ *************************************************/
+blockquote, body, button, dd, dl, dt, fieldset, form, h1, h2, h3, h4, h5, h6, hr, html, input, lengend, li, ol, p, pre, td, textarea, th, ul {
+    margin: 0;
+    padding: 0
+}
+body, button, input, select, textarea, th {
+    color: #4a6075;
+    background-color: #f0f4f8;
+    font-size: 14px;
+    line-height: 1.5;
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Tahoma, Arial, sans-serif;
+}
+h1, h2, h3, h4, h5, h6 {
+    font-size: 100%
+}
+li {
+    list-style: none
+}
+img {
+    border: 0 none;
+    -ms-interpolation-mode: bicubic;
+    image-rendering: optimizeQuality
+}
+input[type=button], input[type=submit] {
+    cursor: pointer
+}
+button {
+    cursor: pointer
+}
+table {
+    border-collapse: collapse;
+    border-spacing: 0
+}
+a {
+    color: #4a9fc7;
+    text-decoration: none
+}
+a:hover {
+    color: #7ec8e3;
+    text-decoration: none
+}
+a:focus, button:focus, input:focus {
+    outline: 0
+}
+.text-center {text-align: center;}
+.clear-fix {zoom: 1;}
+.clear-fix:before, .clear-fix:after {display: table;line-height: 0;content: "";}
+.clear-fix:after {clear: both; }
+.hidden {display: none !important;}
+/*滚动条美化*/
+.mCSB_container::-webkit-scrollbar{width:0;height:0}
+#lyric::-webkit-scrollbar{width:0;height:0}
+
+/* Win11 风格圆角变量 - Blue Archive Theme */
+:root {
+    color-scheme: light only;
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --bg-primary: #f0f4f8;
+    --bg-secondary: #e4ecf2;
+    --bg-card: rgba(255, 255, 255, 0.55);
+    --bg-hover: rgba(126, 200, 227, 0.12);
+    --text-primary: #4a6075;
+    --text-secondary: #5a6f84;
+    --text-muted: #8a9db0;
+    --accent: #4a9fc7;
+    --accent-hover: #3d8baf;
+    --border-subtle: rgba(150, 170, 190, 0.25);
+    --border-light: rgba(150, 170, 190, 0.4);
+}
+
+html,body{
+    height: 100%;
+    width: 100%;
+    background-color: #e8f0f6;
+    overflow: hidden;
+}
+body {
+    background: #e8f0f6;
+    overflow: hidden;
+}
+/* 模糊图像层 */
+#blur-img {
+    position: fixed;
+    height: 100%;
+    left: -10%;
+    width: 120%;
+    overflow: hidden;
+    z-index: 0;
+}
+/* 移动端使用的模糊图像层 */
+#mobile-blur {
+    -webkit-filter: blur(40px) saturate(1.2);
+    filter: blur(40px) saturate(1.2);
+    -webkit-transform: scale(1.15);
+    transform: scale(1.15);
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1;
+    width: 100%;
+    background-size: auto 100%;
+    background-position: center center;
+    background-repeat: no-repeat;
+}
+/* 图像遮罩层 - 浅色半透明 */
+.blur-mask {
+    display: none;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background-color: #e8f0f6;
+    filter:alpha(opacity=75);
+    -moz-opacity:0.75;
+    opacity:0.75;
+    top: 0;
+    left: 0;
+    overflow: hidden;
+}
+
+.mobile-mask {
+    filter:alpha(opacity=80);
+    -moz-opacity:0.8;
+    opacity:0.8;
+}
+
+#mkplayer{
+    display: none;
+}
+
+/* ========== 头部 ========== */
+.header {
+    width: 100%;
+    height: 52px;
+    position: absolute;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 1px 6px rgba(150, 170, 190, 0.1);
+    box-sizing: border-box;
+}
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.logo {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+.logo:hover {
+    color: var(--accent);
+}
+
+/* 头部右侧 - 搜索框 */
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+.search-inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 2px solid rgba(150, 170, 190, 0.3);
+    border-radius: 10px;
+    padding: 0 12px;
+    height: 34px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    flex-shrink: 1;
+    min-width: 0;
+    cursor: text;
+}
+.search-inline:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(126, 200, 227, 0.2);
+}
+.search-icon {
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+.search-inline input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-size: 13px;
+    width: 140px;
+    min-width: 60px;
+    font-family: inherit;
+}
+.search-inline input::placeholder {
+    color: var(--text-muted);
+}
+
+.source-select select {
+    background: rgba(255, 255, 255, 0.6);
+    color: var(--text-secondary);
+    border: 2px solid rgba(150, 170, 190, 0.3);
+    border-radius: 10px;
+    padding: 0 8px;
+    height: 34px;
+    font-size: 13px;
+    cursor: pointer;
+    outline: none;
+    font-family: inherit;
+    appearance: auto;
+}
+.source-select select:hover {
+    border-color: var(--border-light);
+}
+
+/* ========== 宽度约束容器 ========== */
+.container{
+    position: relative;
+    width: 100%;
+    height: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* ========== 中部主要容器 ========== */
+.center{
+    position: absolute;
+    width: 100%;
+    top: 52px;
+    bottom: 88px;
+}
+
+/* ========== 顶部按钮条 ========== */
+.btn-bar {
+    position: absolute;
+    display: inline-block;
+    left: 0;
+    right: 400px;
+    height: 48px;
+}
+
+/* 顶部按钮区域 */
+.btn-box {
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    display: flex;
+    gap: 6px;
+}
+/* 常规按钮 */
+.btn {
+    transition: all 0.2s ease;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    position: relative;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 0 16px;
+    height: 32px;
+    white-space: nowrap;
+}
+.btn:hover {
+    border-color: var(--border-light);
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+.btn-box .active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(126, 200, 227, 0.2);
+}
+.btn[data-action='player'] {
+    display: none;
+}
+.btn-icon {
+    flex-shrink: 0;
+}
+
+/* ========== 搜索弹窗 ========== */
+#search-area {
+    padding: 15px;
+}
+
+/* ========== 左侧主体数据区 ========== */
+.data-area {
+    position: absolute;
+    left: 0;
+    right: 400px;
+    top: 52px;
+    bottom: 0;
+    overflow: hidden;
+}
+
+/* 数据区域容器 */
+.data-box {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    top: 8px;
+    bottom: 8px;
+    overflow-y: auto;
+}
+
+/* ========== 播放列表 css 样式 ========== */
+/* 列表头 */
+.list-head {
+    height: 40px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+/* 一项数据 */
+.list-item {
+    width: 100%;
+    height: 50px;
+    line-height: 50px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    overflow: hidden;
+    border-bottom: 1px solid var(--border-subtle);
+    cursor: pointer;
+    position: relative;
+    transition: background 0.15s ease;
+    border-radius: var(--radius-sm);
+}
+.list-item:hover {
+    background: var(--bg-hover);
+}
+
+/* 正在播放的那项 */
+.list-playing {
+    color: var(--text-primary);
+    background: rgba(126, 200, 227, 0.2);
+    border-radius: var(--radius-sm);
+    margin: 2px 0;
+}
+.list-playing:hover {
+    background: rgba(126, 200, 227, 0.28);
+    border-radius: var(--radius-sm);
+}
+
+/* 列表数字 */
+.list-num {
+    display: block;
+    width: 30px;
+    text-align: center;
+    float: left;
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+/* 正在播放的那项数字 */
+.list-playing .list-num {
+    color: var(--accent);
+    font-size: 11px;
+    text-indent: 0;
+}
+
+/* 音乐名字 */
+.music-name {
+    position: relative;
+    display: block;
+    width: auto;
+    margin-left: 40px;
+    margin-right: 300px;
+    height: 100%;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    -o-user-select: none;
+    user-select: none;
+}
+.music-name-cult {
+    display: block;
+    word-break: keep-all;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.list-item:hover .music-name-cult {
+    padding-right: 150px;
+}
+.list-playing:hover .music-name-cult {
+    padding-right: 100px;
+}
+/* 作者名称与音乐专辑 */
+.auth-name,.music-album {
+    position: relative;
+    display: block;
+    width: 150px;
+    float: right;
+    height: 100%;
+    word-break: keep-all;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+/* 移动端的菜单图标 */
+.list-mobile-menu {
+    display: none;
+}
+
+/*列表中滑动出现的菜单*/
+.list-menu {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    overflow: hidden;
+    font-size: 0;
+    height: 36px;
+    margin-top: -18px;
+    float: right;
+    display: none;
+}
+.list-item:hover .list-menu {
+    display: block;
+}
+.list-head:hover .list-menu {
+    display: none;
+}
+
+/* 列表中滑动出现的小图标 - 使用 SVG 替代 sprite */
+.list-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    float: left;
+    margin-left: 8px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: color 0.15s ease, background 0.15s ease;
+}
+.list-icon:hover {
+    color: var(--accent);
+    background: rgba(126, 200, 227, 0.15);
+}
+.list-playing .icon-play{
+    display: none;
+}
+
+/* 列表中可以被点击的横条 */
+
+/* 文字溢出悬浮提示 */
+.list-tooltip {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    max-width: 400px;
+    padding: 8px 14px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(150, 170, 190, 0.3);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(150, 170, 190, 0.2);
+    color: var(--text-primary);
+    font-size: 13px;
+    line-height: 1.5;
+    word-break: break-all;
+    pointer-events: none;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+.list-clickable {
+    cursor: pointer;
+}
+/* 清空列表按钮 - 降低视觉权重 */
+.list-clickable#list-foot {
+    color: var(--text-muted);
+    font-size: 13px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+.list-clickable#list-foot:hover {
+    opacity: 1;
+}
+
+/* ========== 歌单 css 样式 ========== */
+.sheet-item {
+    position: relative;
+    display: block;
+    width: 25%;
+    float: left;
+    text-align: center;
+    transition: transform 0.15s ease;
+}
+.sheet-item:hover {
+    transform: translateY(-2px);
+}
+.sheet-cover {
+    display: block;
+    width: 96px;
+    height: 96px;
+    margin: 10px auto;
+    cursor: pointer;
+    border-radius: var(--radius-lg);
+    object-fit: cover;
+}
+.sheet-playing:before {
+    content: url(../images/wave.gif);
+    position: absolute;
+    top: 88px;
+    left: 50%;
+    margin-left: -42px;
+}
+
+.sheet-name {
+    display: inline-block;
+    max-width: 120px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    -o-text-overflow: ellipsis;
+    overflow: hidden;
+    margin-bottom: 10px;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 12px;
+}
+/* ========== 右侧播放器区域 ========== */
+.player {
+    height: 100%;
+    width: 400px;
+    float: right;
+    position: relative;
+}
+
+/* 歌曲封面区域 */
+.cover {
+    position: relative;
+    display: block;
+    width: 186px;
+    height: 186px;
+    margin: 20px auto 15px auto;
+}
+.music-cover {
+    vertical-align: middle;
+    width: 186px;
+    height: 186px;
+    border-radius: var(--radius-lg);
+    object-fit: cover;
+}
+
+/* 当前播放信息 */
+.now-playing-info {
+    text-align: center;
+    padding: 0 20px;
+    margin-bottom: 10px;
+}
+.now-playing-info .song-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.now-playing-info .song-artist {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 歌词显示区域 */
+.lyric {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    top: 270px;
+    bottom: 10px;
+    overflow: hidden;
+    text-align: center;
+    color: var(--text-secondary);
+    line-height: 30px;
+    padding: 20px 0;
+}
+#lyric {
+    position: absolute;
+    width: 100%;
+    top: 0;
+    bottom: 0;
+    overflow: hidden;
+}
+#lyric>li {
+    word-break: keep-all;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.3s ease;
+}
+#lyric .lplaying {
+    color: var(--accent);
+    font-weight: 500;
+}
+.lyric-tip {
+    position: absolute;
+    width: 100%;
+    top: 50%;
+    color: var(--text-muted);
+}
+
+/* 歌曲信息按钮 */
+#music-info {
+    transition: all 0.2s ease;
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    right: 10px;
+    bottom: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    opacity: 0.4;
+}
+#music-info:hover {
+    opacity: 1;
+    color: var(--text-primary);
+    border-color: var(--border-light);
+}
+/* ========== 底部 ========== */
+.footer {
+    height: 88px;
+    bottom: 0;
+    width: 100%;
+    position: absolute;
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border-top: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 -1px 6px rgba(150, 170, 190, 0.1);
+    z-index: 10;
+}
+
+/* 控制按钮 */
+.player-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    transition: color 0.15s ease;
+    background-image: none !important;
+}
+.player-btn:hover {
+    color: var(--text-primary);
+}
+
+/* 控制按钮(上一首、播放、下一首)区域 */
+.con-btn {
+    float: left;
+    width: 160px;
+    height: 100%;
+    position: relative;
+    margin: 0 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0;
+}
+.con-btn a{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.btn-prev{
+    width: 24px;
+    height: 24px;
+}
+
+.btn-play{
+    width: 28px;
+    height: 28px;
+}
+.btn-play svg {
+    display: block;
+}
+.btn-next{
+    width: 24px;
+    height: 24px;
+}
+.btn-order{
+    width: 24px;
+    height: 24px;
+}
+.btn-order svg {
+    display: block;
+}
+
+/* ========== 进度条 ========== */
+.progress {
+    width: auto;
+    margin-left: 180px;
+    margin-right: 200px;
+    height: 100%;
+    position: relative;
+}
+
+.progress-box {
+    position: absolute;
+    height: 20px;
+    left: 10px;
+    right: 0;
+    top: 50%;
+    margin-top: -9px;
+}
+
+/* ========== 音量控制区域 ========== */
+.vol {
+    float: right;
+    width: 200px;
+    height: 100%;
+    right: 0;
+    position: relative;
+}
+
+.quiet {
+    width: 50px;
+    height: 100%;
+    position: relative;
+    float: left;
+}
+.btn-quiet{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    top: 50%;
+    right: 0;
+    margin-top: -12px;
+}
+.btn-quiet svg {
+    display: block;
+}
+.volume {
+    position: relative;
+    margin-left: 50px;
+    height: 100%;
+    overflow: hidden;
+}
+.volume-box {
+    position: absolute;
+    height: 20px;
+    left: 10px;
+    right: 10px;
+    top: 50%;
+    margin-top: -10px;
+}
+
+/* ========== 进度条控件样式 ========== */
+.mkpgb-area {
+    position: relative;
+    cursor: pointer;
+    height: 100%;
+}
+#music-progress {
+    margin-right: 100px;
+}
+.audio-time {
+    position: absolute;
+    right: 0;
+    top: 0;
+    font-size: 12px;
+    width: 90px;
+    text-align: center;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+.mkpgb-bar {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 3px; 
+    margin-top: -1.5px; 
+    border-radius: 2px;
+    background-color: var(--border-light);
+    overflow: hidden;
+}
+.mkpgb-cur {
+    position: absolute;
+    background-color: var(--accent); 
+    width: 0; 
+    height: 3px; 
+    top: 50%;
+    margin-top: -1.5px; 
+    border-radius: 2px;
+    transition: width 0.1s linear;
+}
+.mkpgb-dot {
+    width: 10px; 
+    height: 10px; 
+    background-color: var(--accent); 
+    border-radius: 50%; 
+    overflow: hidden; 
+    position: absolute; 
+    left: 0px; 
+    margin-left: -5px; 
+    top: 50%; 
+    margin-top: -5px;
+    transition: left 0.1s linear;
+    box-shadow: 0 0 4px rgba(74, 159, 199, 0.3);
+}
+.mkpgb-locked {
+    cursor: default;
+}
+
+/* 进度条小点闪动效果 - 简化 */
+.dot-move {
+    box-shadow: 0 0 8px var(--accent);
+    -moz-animation: dot-move 2s ease-in-out infinite;
+    -webkit-animation: dot-move 2s ease-in-out infinite;
+    -o-animation: dot-move 2s ease-in-out infinite;
+}
+@-webkit-keyframes dot-move{0%{box-shadow: 0 0 4px var(--accent);}50%{box-shadow: 0 0 12px var(--accent);}100%{box-shadow: 0 0 4px var(--accent);}}
+@keyframes dot-move{0%{box-shadow: 0 0 4px var(--accent);}50%{box-shadow: 0 0 12px var(--accent);}100%{box-shadow: 0 0 4px var(--accent);}}
+
+/* ========== layui layer 弹窗 - Blue Archive 风格 ========== */
+/* 平滑退出动画 - 覆盖 layui 默认的回弹动画 */
+.layer-anim-close {
+    -webkit-animation-name: layer-smoothFadeOut !important;
+    animation-name: layer-smoothFadeOut !important;
+    -webkit-animation-duration: 0.25s !important;
+    animation-duration: 0.25s !important;
+}
+@-webkit-keyframes layer-smoothFadeOut {
+    0% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0.96); }
+}
+@keyframes layer-smoothFadeOut {
+    0% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0.96); }
+}
+/* 入场也改为平滑 */
+.layui-layer.layer-anim-00,
+.layui-layer.layer-anim {
+    -webkit-animation-name: layer-smoothFadeIn !important;
+    animation-name: layer-smoothFadeIn !important;
+    -webkit-animation-duration: 0.25s !important;
+    animation-duration: 0.25s !important;
+}
+@-webkit-keyframes layer-smoothFadeIn {
+    0% { opacity: 0; transform: scale(0.96); }
+    100% { opacity: 1; transform: scale(1); }
+}
+@keyframes layer-smoothFadeIn {
+    0% { opacity: 0; transform: scale(0.96); }
+    100% { opacity: 1; transform: scale(1); }
+}
+.layui-layer {
+    border-radius: 20px !important;
+    border: 1px solid rgba(255, 255, 255, 0.8) !important;
+    box-shadow: 0 8px 32px rgba(150, 170, 190, 0.25) !important;
+    overflow: hidden;
+}
+.layui-layer-content {
+    background: rgba(255, 255, 255, 0.95) !important;
+    color: #4a6075 !important;
+    border-radius: 20px !important;
+}
+.layui-layer-title {
+    background: rgba(255, 255, 255, 0.95) !important;
+    color: #4a6075 !important;
+    border-bottom: 1px solid rgba(150, 170, 190, 0.2) !important;
+    font-weight: 600 !important;
+    padding: 14px 20px 10px !important;
+    font-size: 16px !important;
+}
+.layui-layer-setwin {
+    top: 12px !important;
+    right: 14px !important;
+}
+.layui-layer-setwin a {
+    color: #8a9db0 !important;
+    font-size: 18px !important;
+}
+.layui-layer-setwin a:hover {
+    color: #4a9fc7 !important;
+}
+.layui-layer-btn {
+    padding: 10px 20px 18px !important;
+    text-align: right !important;
+}
+.layui-layer-btn a {
+    border-radius: 20px !important;
+    border: none !important;
+    padding: 8px 20px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    font-family: inherit !important;
+    transition: background 0.2s, transform 0.2s !important;
+}
+.layui-layer-btn .layui-layer-btn0 {
+    background: #7ec8e3 !important;
+    color: #fff !important;
+    border: none !important;
+}
+.layui-layer-btn .layui-layer-btn0:hover {
+    background: #4a9fc7 !important;
+    transform: translateY(-1px) !important;
+}
+.layui-layer-btn .layui-layer-btn1 {
+    background: transparent !important;
+    color: #5a6f84 !important;
+    border: 1px solid rgba(150, 170, 190, 0.3) !important;
+}
+.layui-layer-btn .layui-layer-btn1:hover {
+    background: rgba(126, 200, 227, 0.1) !important;
+}
+.layui-layer-shade {
+    background: rgba(0, 0, 0, 0.3) !important;
+}
+/* 信息弹窗内容 */
+.info-title {
+    color: #8a9db0;
+    font-size: 13px;
+}
+.info-btn {
+    cursor: pointer;
+    color: #4a9fc7;
+    font-weight: 500;
+}
+.info-btn:hover {
+    text-decoration: underline;
+}
+/* 分享弹窗 */
+.share-url {
+    background: rgba(240, 244, 250, 0.8) !important;
+    border: 2px solid rgba(150, 170, 190, 0.3) !important;
+    border-radius: 10px !important;
+    color: #4a6075 !important;
+    font-family: inherit !important;
+}
+.share-url:focus {
+    border-color: #7ec8e3 !important;
+    box-shadow: 0 0 0 3px rgba(126, 200, 227, 0.2) !important;
+}
+.share-tips {
+    color: #8a9db0;
+    font-size: 12px;
+}

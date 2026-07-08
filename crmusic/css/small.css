@@ -1,0 +1,173 @@
+@charset "utf-8";
+/**************************************************
+ * CRMusicNeo - Small Screen Responsive Styles
+ *************************************************/
+
+/* 小于 900px */
+@media screen and (max-width: 900px) {
+    .header {
+        height: 48px;
+    }
+    .header-right {
+        flex-shrink: 1;
+        min-width: 0;
+    }
+    .search-inline input {
+        width: 80px;
+    }
+    .source-select select {
+        font-size: 12px;
+        height: 30px;
+        padding: 0 4px;
+    }
+    
+    .center {
+        top: 48px;
+    }
+    
+    /* 播放器按钮仅移动端显示 */
+    .btn[data-action='player'] {
+        display: inline-flex;
+    }
+    
+    .btn-bar {
+        height: 48px;
+        right: 0;
+        z-index: 999;
+    }
+    .btn-box {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 0 8px;
+    }
+    
+    .data-area {
+        top: 52px;
+        right: 0;
+    }
+    
+    .list-menu {
+        display: none !important;
+    }
+    .music-name-cult {
+        padding-right: 0 !important;
+    }
+    
+    .music-album {
+        margin-right: 30px;
+    }
+    .list-mobile-menu {
+        position: absolute;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 2;
+        cursor: pointer;
+        color: var(--text-muted);
+    }
+    
+    .con-btn {
+        width: 160px;
+    }
+    .progress {
+        width: auto;
+        margin-left: 180px;
+        margin-right: 10px;
+    }
+    .vol {
+        display: none;
+    }
+    
+    .player {
+        display: none;
+        width: 100%;
+    }
+    .cover {
+        margin-top: 60px;
+    }
+    #lyric {
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+    .lyric {
+        top: 260px;
+    }
+}
+
+/* 小于 620px */
+@media screen and (max-width: 620px) {
+    .music-album {
+        display: none;
+    }
+    .auth-name {
+        width: 35%;
+        padding-right: 30px;
+        box-sizing: border-box;
+    }
+    .music-name {
+        margin-right: 35%;
+    }
+    
+    .search-inline {
+        height: 30px;
+        padding: 0 8px;
+    }
+    .search-inline input {
+        width: 80px;
+        font-size: 12px;
+    }
+    .logo {
+        font-size: 15px;
+    }
+}
+
+/* 小于 500px */
+@media screen and (max-width: 500px) {
+    .center {
+        bottom: 72px;
+    }
+    .sheet-item {   
+        width: 33.33%;
+    }
+    .sheet-name {
+        max-width: 100px;
+    }
+    .cover {
+        margin-top: 50px;
+    }
+    .footer {
+        height: 72px;
+    }
+    .source-select {
+        display: none;
+    }
+    
+    .header {
+        padding: 0 10px;
+    }
+    .header-left .logo {
+        font-size: 14px;
+    }
+}
+
+/* 小于 350px */
+@media screen and (max-width: 350px) {
+    .sheet-item {   
+        width: 50%;
+    }
+    .search-inline input {
+        width: 60px;
+    }
+}
