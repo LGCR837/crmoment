@@ -12,11 +12,13 @@ define('DB_PASS', '4JZQTTQHSHP8');
 define('DB_CHARSET', 'utf8mb4');
 
 // 站点 URL（结尾不要斜杠）
-define('SITE_URL', 'https://crmoment.ccwu.cc');
+define('SITE_URL', '');
 
 // 上传限制
 define('MAX_FILE_SIZE', 5 * 1024 * 1024); // 5MB
+define('MAX_VIDEO_SIZE', 28 * 1024 * 1024); // 28MB
 define('ALLOWED_EXTENSIONS', ['jpg', 'jpeg', 'png', 'gif', 'webp']);
+define('ALLOWED_VIDEO_EXTENSIONS', ['mp4', 'webm', 'mov', 'avi']);
 
 // 分页默认值
 define('PAGE_SIZE', 20);

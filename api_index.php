@@ -118,6 +118,8 @@ try {
     // ---- Upload ----
     } elseif ($path === '/upload/image' && $method === 'POST') {
         handleUploadImage();
+    } elseif ($path === '/upload/video' && $method === 'POST') {
+        handleUploadVideo();
 
     // ---- Music ----
     } elseif ($path === '/music' && $method === 'GET') {

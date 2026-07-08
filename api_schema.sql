@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS `posts` (
     `user_id` INT UNSIGNED NOT NULL,
     `content` TEXT NOT NULL,
     `images` JSON DEFAULT NULL COMMENT '图片路径数组 ["/uploads/posts/...", ...]',
+    `videos` JSON DEFAULT NULL COMMENT '视频路径数组 ["/uploads/videos/...", ...]',
     `likes_count` INT UNSIGNED DEFAULT 0,
     `comments_count` INT UNSIGNED DEFAULT 0,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,

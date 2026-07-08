@@ -21,7 +21,7 @@ function handlePostsList(): void {
 
     // 获取列表（含作者信息）
     $stmt = $pdo->prepare(
-        'SELECT p.id, p.content, p.images, p.likes_count, p.comments_count, p.created_at,
+        'SELECT p.id, p.content, p.images, p.videos, p.likes_count, p.comments_count, p.created_at,
                 u.id AS user_id, u.username, u.nickname, u.avatar
          FROM posts p
          JOIN users u ON p.user_id = u.id
@@ -38,6 +38,7 @@ function handlePostsList(): void {
         $post['likes_count']   = (int)$post['likes_count'];
         $post['comments_count'] = (int)$post['comments_count'];
         $post['images']        = $post['images'] ? json_decode($post['images'], true) : [];
+        $post['videos']        = $post['videos'] ? json_decode($post['videos'], true) : [];
     }
     unset($post);
 
@@ -73,7 +74,7 @@ function handlePostsShow(int $id): void {
 
     $pdo  = getDB();
     $stmt = $pdo->prepare(
-        'SELECT p.id, p.content, p.images, p.likes_count, p.comments_count, p.created_at,
+        'SELECT p.id, p.content, p.images, p.videos, p.likes_count, p.comments_count, p.created_at,
                 u.id AS user_id, u.username, u.nickname, u.avatar
          FROM posts p
          JOIN users u ON p.user_id = u.id
@@ -91,6 +92,7 @@ function handlePostsShow(int $id): void {
     $post['likes_count']   = (int)$post['likes_count'];
     $post['comments_count'] = (int)$post['comments_count'];
     $post['images']        = $post['images'] ? json_decode($post['images'], true) : [];
+    $post['videos']        = $post['videos'] ? json_decode($post['videos'], true) : [];
 
     // 点赞状态
     $currentUserId = getCurrentUserId();
@@ -128,7 +130,7 @@ function handlePostsShow(int $id): void {
 
 /**
  * POST /posts
- * multipart/form-data: content, images[] (最多9张)
+ * multipart/form-data: content, images[] (最多9张), videos[] (最多1个)
  */
 function handlePostsCreate(): void {
     $userId = requireLogin();
@@ -172,22 +174,60 @@ function handlePostsCreate(): void {
         }
     }
 
+    $videoPaths = [];
+
+    // 处理上传的视频（最多 1 个）
+    if (!empty($_FILES['videos'])) {
+        $files = $_FILES['videos'];
+        $name     = is_array($files['name']) ? $files['name'][0] : $files['name'];
+        $tmpName  = is_array($files['tmp_name']) ? $files['tmp_name'][0] : $files['tmp_name'];
+        $error    = is_array($files['error']) ? $files['error'][0] : $files['error'];
+        $size     = is_array($files['size']) ? $files['size'][0] : $files['size'];
+
+        if ($error === UPLOAD_ERR_OK && $size > 0 && $size <= MAX_VIDEO_SIZE) {
+            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+            if (in_array($ext, ALLOWED_VIDEO_EXTENSIONS, true)) {
+                // 验证 MIME 类型（优先 finfo，不可用时靠扩展名推断）
+                $allowedMime = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo'];
+                $mime = '';
+                if (function_exists('finfo_open')) {
+                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                    $mime = finfo_file($finfo, $tmpName);
+                    finfo_close($finfo);
+                }
+                if (!$mime) {
+                    $mimeMap = ['mp4' => 'video/mp4', 'webm' => 'video/webm', 'mov' => 'video/quicktime', 'avi' => 'video/x-msvideo'];
+                    $mime = $mimeMap[$ext] ?? '';
+                }
+                if (in_array($mime, $allowedMime, true)) {
+                    $filename = randomFileName($ext);
+                    $dest = getUploadDir('video') . '/' . $filename;
+                    if (move_uploaded_file($tmpName, $dest)) {
+                        $videoPaths[] = getUploadUrl('video', $filename);
+                    }
+                }
+            }
+        }
+    }
+
     $pdo = getDB();
     $stmt = $pdo->prepare(
-        'INSERT INTO posts (user_id, content, images, likes_count, comments_count, created_at)
-         VALUES (?, ?, ?, 0, 0, NOW())'
+        'INSERT INTO posts (user_id, content, images, videos, likes_count, comments_count, created_at)
+         VALUES (?, ?, ?, ?, 0, 0, NOW())'
     );
     $stmt->execute([
         $userId,
         $content,
         empty($imagePaths) ? null : json_encode($imagePaths, JSON_UNESCAPED_UNICODE),
+        empty($videoPaths) ? null : json_encode($videoPaths, JSON_UNESCAPED_UNICODE),
     ]);
     $postId = (int)$pdo->lastInsertId();
 
     success([
-        'id' => $postId,
+        'id'      => $postId,
         'content' => $content,
         'images'  => $imagePaths,
+        'videos'  => $videoPaths,
     ], '发布成功');
 }
 
@@ -199,7 +239,7 @@ function handlePostsDelete(int $id): void {
     $userId = requireLogin();
 
     $pdo  = getDB();
-    $stmt = $pdo->prepare('SELECT user_id, images, created_at FROM posts WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT user_id, images, videos, created_at FROM posts WHERE id = ?');
     $stmt->execute([$id]);
     $post = $stmt->fetch();
 
@@ -224,6 +264,17 @@ function handlePostsDelete(int $id): void {
         $images = json_decode($post['images'], true);
         foreach ($images as $img) {
             $filePath = __DIR__ . '/' . ltrim($img, '/');
+            if (file_exists($filePath)) {
+                @unlink($filePath);
+            }
+        }
+    }
+
+    // 删除关联视频文件
+    if ($post['videos']) {
+        $videos = json_decode($post['videos'], true);
+        foreach ($videos as $vid) {
+            $filePath = __DIR__ . '/' . ltrim($vid, '/');
             if (file_exists($filePath)) {
                 @unlink($filePath);
             }

@@ -216,6 +216,11 @@ function getUploadDir(string $type): string {
         if (!is_dir($dir)) mkdir($dir, 0755, true);
         return $dir;
     }
+    if ($type === 'video') {
+        $dir = __DIR__ . '/uploads/videos/' . date('Y') . '/' . date('m');
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
+        return $dir;
+    }
     // post images
     $dir = __DIR__ . '/uploads/posts/' . date('Y') . '/' . date('m');
     if (!is_dir($dir)) mkdir($dir, 0755, true);
@@ -228,6 +233,9 @@ function getUploadDir(string $type): string {
 function getUploadUrl(string $type, string $filename): string {
     if ($type === 'avatar') {
         return '/uploads/avatars/' . $filename;
+    }
+    if ($type === 'video') {
+        return '/uploads/videos/' . date('Y') . '/' . date('m') . '/' . $filename;
     }
     return '/uploads/posts/' . date('Y') . '/' . date('m') . '/' . $filename;
 }

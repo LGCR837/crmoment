@@ -176,7 +176,7 @@ window.addEventListener('popstate', () => {
 
 // ===== Icon Helper =====
 function icon(name) {
-    return `<span class="material-symbols-outlined">${name}</span>`;
+    return '';
 }
 
 // ===== Avatar Helper =====
@@ -203,7 +203,7 @@ function retryArea(msg, retryFn) {
         const el = document.getElementById(id);
         if (el) el.addEventListener('click', (e) => { e.stopPropagation(); retryFn(); });
     }, 0);
-    return `<div class="retry-area">${escapeHtml(msg)}<br><button class="btn-primary retry-btn" id="${id}">${icon('refresh')} 重试</button></div>`;
+    return `<div class="retry-area">${escapeHtml(msg)}<br><button class="btn-primary retry-btn" id="${id}">重试</button></div>`;
 }
 
 // ===== Auth =====
@@ -469,8 +469,8 @@ async function scrollToPost(postId) {
         if (!target) { showToast('无法定位到该动态'); return; }
     }
     target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    target.style.boxShadow = '0 0 0 3px var(--ba-blue), var(--ba-card-shadow-hover)';
-    target.style.borderColor = 'var(--ba-blue)';
+    target.style.boxShadow = '0 0 0 2px var(--ba-primary), var(--ba-card-shadow-hover)';
+    target.style.borderColor = 'var(--ba-primary)';
     setTimeout(() => { target.style.boxShadow = ''; target.style.borderColor = ''; }, 3000);
 }
 
@@ -493,7 +493,7 @@ function renderPostCard(post) {
     }
     const recallHtml = canRecall ? `
         <button class="action-btn recall-btn" data-post-id="${post.id}">
-            ${icon('undo')}<span>撤回</span>
+            <span>撤回</span>
         </button>` : '';
 
     return `
@@ -510,17 +510,16 @@ function renderPostCard(post) {
         ${imageHtml}
         <div class="post-actions">
             <button class="action-btn like-btn ${likedClass}" data-post-id="${post.id}">
-                ${icon(post.is_liked ? 'favorite' : 'favorite_border')}
+                ${post.is_liked ? '[已赞]' : '[赞]'}
                 <span>${post.likes_count || 0}</span>
             </button>
             <button class="action-btn comment-btn" data-post-id="${post.id}">
-                ${icon('chat_bubble_outline')}
+                [评]
                 <span class="comment-count">${post.comments_count || 0}</span>
             </button>
             ${recallHtml}
             <button class="action-btn share-btn" data-url="${postUrl}">
-                ${icon('share')}<span>分享</span>
-            </button>
+                分享</button>
         </div>
     </div>`;
 }
@@ -557,7 +556,8 @@ async function handleLike(postId) {
             const likeBtn = card.querySelector('.like-btn');
             if (likeBtn) {
                 likeBtn.classList.toggle('liked', post.is_liked);
-                likeBtn.querySelector('.material-symbols-outlined').textContent = post.is_liked ? 'favorite' : 'favorite_border';
+                const textNode = likeBtn.childNodes[0];
+                if (textNode) textNode.textContent = post.is_liked ? '[已赞]' : '[赞]';
                 likeBtn.querySelector('span:last-child').textContent = post.likes_count;
             }
         }
@@ -658,8 +658,8 @@ dom.composerImagesInput.addEventListener('change', () => {
     const newPreviews = newFiles.map((f, i) => {
         const url = URL.createObjectURL(f);
         return `<div class="preview-item" data-idx="${startIdx + i}" style="position:relative;width:80px;height:80px;cursor:pointer">
-            <img src="${url}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:8px;border:1px solid rgba(150,170,190,0.3)">
-            <div class="preview-remove" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;background:var(--ba-pink);color:#fff;border-radius:50%;font-size:14px;line-height:20px;text-align:center;display:none;box-shadow:0 1px 3px rgba(0,0,0,0.3)">×</div>
+            <img src="${url}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:0px;border:2px solid var(--ba-black)">
+            <div class="preview-remove" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;background:var(--ba-primary);color:#fff;border-radius:0px;font-size:14px;line-height:20px;text-align:center;display:none;box-shadow:2px 2px 0px 0px rgba(0,0,0,1)">×</div>
         </div>`;
     }).join('\n');
     dom.imagePreview.insertAdjacentHTML('beforeend', newPreviews);
@@ -689,8 +689,8 @@ dom.composerVideosInput.addEventListener('change', () => {
     updateMediaCount();
     dom.videoPreview.innerHTML = `
         <div class="preview-item" data-idx="0" style="position:relative;width:140px;height:100px;cursor:pointer">
-            <video src="${URL.createObjectURL(file)}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;border:1px solid rgba(150,170,190,0.3)" muted></video>
-            <div class="preview-remove" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;background:var(--ba-pink);color:#fff;border-radius:50%;font-size:14px;line-height:20px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.3)">×</div>
+            <video src="${URL.createObjectURL(file)}" style="width:100%;height:100%;object-fit:cover;border-radius:0px;border:2px solid var(--ba-black)" muted></video>
+            <div class="preview-remove" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;background:var(--ba-primary);color:#fff;border-radius:0px;font-size:14px;line-height:20px;text-align:center;box-shadow:2px 2px 0px 0px rgba(0,0,0,1)">×</div>
         </div>`;
     dom.composerVideosInput.value = '';
 });
@@ -1004,7 +1004,7 @@ async function renderProfile() {
             <div class="section-title">我的</div>
             <div class="profile-header">
                 <p style="color:var(--ba-text-muted);margin-bottom:16px">请先登录以查看个人主页</p>
-                <button class="btn-primary" id="profile-login-btn">${icon('login')} 登录 / 注册</button>
+                <button class="btn-primary" id="profile-login-btn">登录 / 注册</button>
             </div>`;
         $('#profile-login-btn')?.addEventListener('click', () => { switchAuthMode('login'); dialogOpen(dom.authOverlay); });
         return;
@@ -1020,8 +1020,8 @@ async function renderProfile() {
                 <div class="stat"><div class="stat-num" id="profile-post-count">0</div><div class="stat-label">动态</div></div>
             </div>
             <div class="profile-edit-btn">
-                <button class="btn-text" id="btn-edit-avatar">${icon('photo_camera')} 更换头像</button>
-                <button class="btn-text" id="btn-logout" style="color:#d4a0a0">退出登录</button>
+                <button class="btn-text" id="btn-edit-avatar">更换头像</button>
+                <button class="btn-text" id="btn-logout" style="color:#d73333">退出登录</button>
             </div>
             <input type="file" id="avatar-input" accept="image/*" style="display:none">
         </div>
@@ -1126,7 +1126,7 @@ async function renderUserProfile(userId) {
         dom.main.innerHTML = `
             <div class="profile-header">
                 <div class="user-profile-back">
-                    <button class="btn-text" id="btn-back-from-user">${icon('arrow_back')} 返回</button>
+                    <button class="btn-text" id="btn-back-from-user">返回</button>
                 </div>
                 <img src="${avatarSrc(user.avatar)}" class="profile-avatar"
                      onerror="${avatarOnerror(user.nickname || user.username)}">
@@ -1137,7 +1137,7 @@ async function renderUserProfile(userId) {
                     <div class="stat"><div class="stat-num">${user.posts_count || 0}</div><div class="stat-label">动态</div></div>
                 </div>
                 ${!isSelf ? `<div style="margin-top:12px;display:flex;gap:8px;justify-content:center">
-                    <button class="btn-primary" id="btn-start-chat" data-user-id="${userId}">${icon('chat')} 发私信</button>
+                    <button class="btn-primary" id="btn-start-chat" data-user-id="${userId}">发私信</button>
                 </div>` : ''}
             </div>
             <div class="section-title">${escapeHtml(user.nickname || user.username)} 的动态</div>
@@ -1168,8 +1168,8 @@ async function renderUserProfile(userId) {
     } catch (e) {
         dom.main.innerHTML = `
             <div class="profile-header">
-                <button class="btn-text" id="btn-back-from-user">${icon('arrow_back')} 返回</button>
-                <p style="color:#d4a0a0;text-align:center">加载失败: ${escapeHtml(e.message)}</p>
+                <button class="btn-text" id="btn-back-from-user">返回</button>
+                <p style="color:#d73333;text-align:center">加载失败: ${escapeHtml(e.message)}</p>
             </div>`;
         $('#btn-back-from-user')?.addEventListener('click', () => { navigateTo('home'); });
     }
@@ -1179,20 +1179,20 @@ async function renderUserProfile(userId) {
 async function renderExplore() {
     dom.main.innerHTML = `
         <div class="section-title">发现</div>
-        <div style="background:var(--ba-card-bg);border-radius:var(--ba-radius-lg);padding:16px 24px 20px;border:1px solid var(--ba-card-border);box-shadow:var(--ba-card-shadow);text-align:center;margin-bottom:16px">
-            <span class="material-symbols-outlined" style="font-size:48px;color:var(--ba-blue);margin-bottom:12px;display:block">explore</span>
+        <div style="background:var(--ba-card-bg);border-radius:var(--ba-radius-lg);padding:16px 24px 20px;border:2px solid var(--ba-card-border);box-shadow:var(--ba-card-shadow);text-align:center;margin-bottom:16px">
+            <div style="font-size:14px;font-weight:700;color:var(--ba-primary);margin-bottom:12px;letter-spacing:1px">EXPLORE</div>
             <h3 style="margin-bottom:8px;color:var(--ba-text)">探索 CRMoment</h3>
             <p style="color:var(--ba-text-secondary);line-height:1.6">一个轻量的动态分享社区。<br>浏览最新动态，分享你的生活瞬间。</p>
             <div style="margin-top:20px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-                <button class="btn-primary" id="explore-home-btn">${icon('home')} 去看看动态</button>
-                ${!state.user ? `<button class="btn-secondary" id="explore-login-btn">${icon('login')} 登录体验更多</button>` : ''}
+                <button class="btn-primary" id="explore-home-btn">去看看动态</button>
+                ${!state.user ? `<button class="btn-secondary" id="explore-login-btn">登录体验更多</button>` : ''}
             </div>
         </div>
         <div class="music-section-header">
-            <div class="section-title"><span class="material-symbols-outlined" style="font-size:20px;vertical-align:middle;margin-right:4px">music_note</span> 音乐广场</div>
+            <div class="section-title">音乐广场</div>
             <div class="music-header-actions">
-                <button class="btn-primary" id="btn-search-music" style="padding:6px 16px;font-size:13px">${icon('search')} 搜索</button>
-                ${state.user ? `<button class="btn-primary" id="btn-add-music" style="padding:6px 16px;font-size:13px">${icon('add')} 添加音乐</button>` : ''}
+                <button class="btn-primary" id="btn-search-music" style="padding:6px 16px;font-size:13px">搜索</button>
+                ${state.user ? `<button class="btn-primary" id="btn-add-music" style="padding:6px 16px;font-size:13px">添加音乐</button>` : ''}
             </div>
         </div>
         <div id="music-list"></div>
@@ -1275,10 +1275,10 @@ function renderMusicList() {
                     <span>${item.plays_count} 次播放</span>
                     <span>${timeStr}</span>
                     <span class="music-right-group">
-                        <button class="btn-text music-lite-btn" data-id="${item.id}" data-music="${escapeHtml(item.music_url)}" data-lrc="${escapeHtml(item.lrc_url)}" style="padding:4px 8px;font-size:12px" title="Lite 模式（仅音频+歌词）">${icon('play_circle')} Lite</button>
+                        <button class="btn-text music-lite-btn" data-id="${item.id}" data-music="${escapeHtml(item.music_url)}" data-lrc="${escapeHtml(item.lrc_url)}" style="padding:4px 8px;font-size:12px" title="Lite 模式（仅音频+歌词）">Lite</button>
                         ${isOwner ? `<span class="music-actions">
-                            <button class="btn-text music-edit-btn" data-id="${item.id}" style="padding:4px 8px;font-size:12px">${icon('edit')} 编辑</button>
-                            <button class="btn-text music-del-btn" data-id="${item.id}" style="padding:4px 8px;font-size:12px;color:#d4a0a0">${icon('delete')} 删除</button>
+                            <button class="btn-text music-edit-btn" data-id="${item.id}" style="padding:4px 8px;font-size:12px">编辑</button>
+                            <button class="btn-text music-del-btn" data-id="${item.id}" style="padding:4px 8px;font-size:12px;color:#d73333">删除</button>
                         </span>` : ''}
                     </span>
                 </div>
@@ -1393,7 +1393,7 @@ async function renderConversationList() {
     dom.main.innerHTML = `
         <div class="conv-list-header">
             <div class="section-title" style="margin:0">信息</div>
-            <button class="btn-primary" id="btn-create-group" style="padding:6px 16px;font-size:13px">${icon('group_add')} 创建群聊</button>
+            <button class="btn-primary" id="btn-create-group" style="padding:6px 16px;font-size:13px">创建群聊</button>
         </div>
         <div id="conv-list"></div>`;
     $('#btn-create-group')?.addEventListener('click', openCreateGroupDialog);
@@ -1416,7 +1416,7 @@ function renderConvItem(conv) {
 
     if (conv.type === 'group') {
         return `<div class="conv-item" id="conv-item-${conv.id}">
-            <div class="conv-avatar-wrap"><div class="conv-avatar conv-avatar-group">${icon('group')}</div></div>
+            <div class="conv-avatar-wrap"><div class="conv-avatar conv-avatar-group">G</div></div>
             <div class="conv-info">
                 <div class="conv-name-row">
                     <span class="conv-name">${escapeHtml(conv.display_name || conv.name || '群聊')}</span>
@@ -1464,7 +1464,7 @@ async function renderConversationDetail(convId) {
     dom.main.innerHTML = `
         <div class="chat-detail">
             <div class="chat-detail-header">
-                <button class="btn-icon" id="btn-back-to-conv">${icon('arrow_back')}</button>
+                <button class="btn-icon" id="btn-back-to-conv">返回</button>
                 <span class="chat-detail-title">${escapeHtml(displayName)}</span>
             </div>
             <div class="chat-messages" id="chat-messages">
@@ -1472,11 +1472,11 @@ async function renderConversationDetail(convId) {
                 ${messages.map(m => renderChatMessage(m)).join('\n')}
             </div>
             <div class="chat-input-bar">
-                <button class="btn-icon" id="btn-chat-image" title="发送图片">${icon('add_photo_alternate')}</button>
+                <button class="btn-icon" id="btn-chat-image" title="发送图片">图片</button>
                 <input type="file" id="chat-image-input" accept="image/*" style="display:none">
-                ${state.currentConvType === 'group' ? `<button class="btn-icon" id="btn-chat-invite" title="邀请成员">${icon('person_add')}</button>` : ''}
+                ${state.currentConvType === 'group' ? `<button class="btn-icon" id="btn-chat-invite" title="邀请成员">邀请</button>` : ''}
                 <textarea id="chat-input" placeholder="输入消息..." rows="1" maxlength="5000"></textarea>
-                <button class="btn-primary" id="btn-chat-send">${icon('send')} 发送</button>
+                <button class="btn-primary" id="btn-chat-send">发送</button>
             </div>
         </div>`;
 
@@ -1854,7 +1854,23 @@ async function init() {
     $('#search-music-cancel')?.addEventListener('click', () => dialogClose($('#search-music-overlay')));
     $('#search-music-clear')?.addEventListener('click', handleSearchClear);
     $('#music-search')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSearchSubmit(); });
-    console.log('CRMoment Web App (BA Theme) 已启动');
+    console.log('CRMoment Web App (21th Theme) 已启动');
+
+    // :has() compatibility fallback for radio button styling
+    document.addEventListener('change', (e) => {
+        if (e.target.classList && e.target.classList.contains('lrc-pos-radio')) {
+            const name = e.target.name;
+            document.querySelectorAll(`.lrc-pos-radio[name="${name}"]`).forEach(r => {
+                const opt = r.closest('.lrc-pos-option');
+                if (opt) opt.classList.toggle('active-radio', r.checked);
+            });
+        }
+    });
+    // Init existing checked radios
+    document.querySelectorAll('.lrc-pos-radio:checked').forEach(r => {
+        const opt = r.closest('.lrc-pos-option');
+        if (opt) opt.classList.add('active-radio');
+    });
 }
 
 document.addEventListener('DOMContentLoaded', init);

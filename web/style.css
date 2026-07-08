@@ -292,6 +292,17 @@ a:hover { text-decoration: underline; }
 .post-images img:hover { transform: scale(1.02); }
 .post-images.single { grid-template-columns: 1fr; max-width: 300px; }
 
+/* ===== Video Display ===== */
+.post-videos { display: grid; grid-template-columns: 1fr; max-width: 300px; gap: 6px; margin-bottom: 12px; }
+.post-videos:empty { display: none; }
+.post-videos .video-link { display: block; width: 100%; cursor: pointer; }
+.post-videos .video-placeholder {
+    width: 100%; aspect-ratio: 1; object-fit: cover; cursor: pointer;
+    border-radius: 8px; transition: transform 0.2s; display: block;
+    background: rgba(0,0,0,0.06);
+}
+.post-videos .video-placeholder:hover { transform: scale(1.02); }
+
 /* ===== Image Viewer Overlay ===== */
 #imageViewerOverlay {
     position: fixed;
@@ -559,7 +570,8 @@ textarea.field-input {
 }
 .music-card-author { color: var(--ba-blue-dark); cursor: pointer; font-weight: 500; }
 .music-card-author:hover { text-decoration: underline; }
-.music-actions { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; }
+.music-actions { display: inline-flex; align-items: center; gap: 2px; }
+.music-right-group { margin-left: auto; display: inline-flex; align-items: center; gap: 12px; flex-shrink: 0; }
 
 /* ===== LRC Position Radio ===== */
 .lrc-pos-group {

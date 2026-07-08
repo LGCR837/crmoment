@@ -74,8 +74,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     try {
         $pdo  = getDB();
 
-        // 获取动态信息（含图片）
-        $stmt = $pdo->prepare('SELECT id, images FROM posts WHERE id = ?');
+        // 获取动态信息（含图片、视频）
+        $stmt = $pdo->prepare('SELECT id, images, videos FROM posts WHERE id = ?');
         $stmt->execute([$postId]);
         $post = $stmt->fetch();
 
@@ -90,6 +90,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             if (is_array($images)) {
                 foreach ($images as $img) {
                     $filePath = __DIR__ . '/' . ltrim($img, '/');
+                    if (file_exists($filePath)) {
+                        @unlink($filePath);
+                    }
+                }
+            }
+        }
+
+        // 删除关联的视频文件
+        if ($post['videos']) {
+            $videos = json_decode($post['videos'], true);
+            if (is_array($videos)) {
+                foreach ($videos as $vid) {
+                    $filePath = __DIR__ . '/' . ltrim($vid, '/');
                     if (file_exists($filePath)) {
                         @unlink($filePath);
                     }
@@ -133,6 +146,38 @@ if ($loggedIn) {
         unset($u);
         $totalUsers = count($users);
 
+        // 近两个月注册/发帖统计（用于图表）
+        $dailyUsers = [];
+        $dailyPosts = [];
+        $stmt = $pdo->query(
+            'SELECT DATE(created_at) AS day, COUNT(*) AS cnt FROM users
+             WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 60 DAY)
+             GROUP BY day ORDER BY day ASC'
+        );
+        $dailyUsers = $stmt->fetchAll();
+        $stmt = $pdo->query(
+            'SELECT DATE(created_at) AS day, COUNT(*) AS cnt FROM posts
+             WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 60 DAY)
+             GROUP BY day ORDER BY day ASC'
+        );
+        $dailyPosts = $stmt->fetchAll();
+        // 补全缺失的天数为0
+        $dailyUsersMap = [];
+        foreach ($dailyUsers as $r) $dailyUsersMap[$r['day']] = (int)$r['cnt'];
+        $dailyPostsMap = [];
+        foreach ($dailyPosts as $r) $dailyPostsMap[$r['day']] = (int)$r['cnt'];
+        $chartDays = [];
+        for ($i = 59; $i >= 0; $i--) {
+            $d = date('Y-m-d', strtotime("-$i days"));
+            $chartDays[] = [
+                'day'  => date('m-d', strtotime($d)),
+                'users' => (int)($dailyUsersMap[$d] ?? 0),
+                'posts' => (int)($dailyPostsMap[$d] ?? 0),
+            ];
+        }
+        $maxUsers = max(array_column($chartDays, 'users')) ?: 1;
+        $maxPosts = max(array_column($chartDays, 'posts')) ?: 1;
+
         // 动态列表（分页）
         $page = max(1, (int)($_GET['page'] ?? 1));
         $size = max(1, min(100, (int)($_GET['size'] ?? 20)));
@@ -142,7 +187,7 @@ if ($loggedIn) {
         $totalPosts = (int)$stmt->fetch()['cnt'];
 
         $stmt = $pdo->prepare(
-            'SELECT p.id, p.content, p.images, p.likes_count, p.comments_count, p.created_at,
+            'SELECT p.id, p.content, p.images, p.videos, p.likes_count, p.comments_count, p.created_at,
                     u.id AS user_id, u.username, u.nickname
              FROM posts p
              JOIN users u ON p.user_id = u.id
@@ -158,6 +203,16 @@ if ($loggedIn) {
             $p['likes_count']   = (int)$p['likes_count'];
             $p['comments_count'] = (int)$p['comments_count'];
             $p['images']        = $p['images'] ? json_decode($p['images'], true) : [];
+            $p['videos']        = $p['videos'] ? json_decode($p['videos'], true) : [];
+            // 计算视频文件总大小
+            $videoSize = 0;
+            foreach ($p['videos'] as $vid) {
+                $fp = __DIR__ . '/' . ltrim($vid, '/');
+                if (file_exists($fp)) {
+                    $videoSize += filesize($fp);
+                }
+            }
+            $p['video_size'] = $videoSize;
         }
         unset($p);
 
@@ -200,6 +255,18 @@ a:hover { text-decoration: underline; }
 .admin-header .admin-info { font-size: 13px; color: #aaa; }
 .admin-header a { color: #ff6b6b; font-size: 13px; margin-left: 12px; }
 .container { max-width: 1200px; margin: 0 auto; padding: 20px 16px; }
+
+/* 统计图表 */
+.chart-row { display: flex; gap: 20px; margin-bottom: 24px; flex-wrap: wrap; }
+.chart-box { flex: 1; min-width: 260px; background: #fff; border-radius: 8px; padding: 18px 20px 14px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.chart-box .chart-title { font-size: 13px; font-weight: 600; color: #555; margin-bottom: 10px; }
+.chart-bars { display: flex; align-items: flex-end; gap: 3px; height: 80px; }
+.chart-bar { flex: 1; min-width: 6px; border-radius: 3px 3px 0 0; position: relative; transition: height .2s; }
+.chart-bar-user { background: linear-gradient(to top, #1a73e8, #4a9af5); }
+.chart-bar-post { background: linear-gradient(to top, #e8710a, #f5a623); }
+.chart-labels { display: flex; gap: 3px; margin-top: 4px; }
+.chart-labels span { flex: 1; min-width: 6px; font-size: 8px; color: #999; text-align: center; overflow: hidden; }
+.chart-empty { color: #bbb; font-size: 12px; padding: 20px 0; text-align: center; }
 
 /* 统计卡片 */
 .stats { display: flex; gap: 16px; margin-bottom: 24px; }
@@ -304,6 +371,44 @@ tbody tr:last-child td { border-bottom: none; }
         </div>
     </div>
 
+    <!-- 近14日趋势图 -->
+    <div class="chart-row">
+        <div class="chart-box">
+            <div class="chart-title">📈 每日注册（近两个月）</div>
+            <?php if (array_sum(array_column($chartDays, 'users')) === 0): ?>
+                <div class="chart-empty">暂无数据</div>
+            <?php else: ?>
+            <div class="chart-bars">
+                <?php $ci = 0; foreach ($chartDays as $d): ?>
+                    <div class="chart-bar chart-bar-user" style="height:<?= max(4, round($d['users'] / $maxUsers * 76)) ?>px" title="<?= $d['day'] ?>: <?= $d['users'] ?> 人"></div>
+                <?php $ci++; endforeach; ?>
+            </div>
+            <div class="chart-labels">
+                <?php $ci = 0; foreach ($chartDays as $d): ?>
+                    <span<?= ($ci % 5 === 0 || $ci === 59) ? '' : ' style="visibility:hidden"' ?> title="<?= $d['day'] ?>"><?= $d['day'] ?></span>
+                <?php $ci++; endforeach; ?>
+            </div>
+            <?php endif; ?>
+        </div>
+        <div class="chart-box">
+            <div class="chart-title">📝 每日发帖（近两个月）</div>
+            <?php if (array_sum(array_column($chartDays, 'posts')) === 0): ?>
+                <div class="chart-empty">暂无数据</div>
+            <?php else: ?>
+            <div class="chart-bars">
+                <?php $ci = 0; foreach ($chartDays as $d): ?>
+                    <div class="chart-bar chart-bar-post" style="height:<?= max(4, round($d['posts'] / $maxPosts * 76)) ?>px" title="<?= $d['day'] ?>: <?= $d['posts'] ?> 条"></div>
+                <?php $ci++; endforeach; ?>
+            </div>
+            <div class="chart-labels">
+                <?php $ci = 0; foreach ($chartDays as $d): ?>
+                    <span<?= ($ci % 5 === 0 || $ci === 59) ? '' : ' style="visibility:hidden"' ?> title="<?= $d['day'] ?>"><?= $d['day'] ?></span>
+                <?php $ci++; endforeach; ?>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
     <?php if (isset($dbError)): ?>
         <div style="background:#fce8e6;color:#d93025;padding:12px 16px;border-radius:6px;margin-bottom:16px;"><?= htmlspecialchars($dbError) ?></div>
     <?php endif; ?>
@@ -361,7 +466,7 @@ tbody tr:last-child td { border-bottom: none; }
                     <th class="col-id">ID</th>
                     <th>作者</th>
                     <th>内容</th>
-                    <th>图片</th>
+                    <th>媒体</th>
                     <th class="col-small">👍 点赞</th>
                     <th class="col-small">💬 评论</th>
                     <th class="col-small">时间</th>
@@ -373,6 +478,19 @@ tbody tr:last-child td { border-bottom: none; }
                     <tr><td colspan="8" class="empty-state">暂无动态</td></tr>
                 <?php else: ?>
                     <?php foreach ($posts as $p): ?>
+                    <?php
+                        $imgCount = count($p['images']);
+                        $vidCount = count($p['videos']);
+                        $vidSizeStr = '';
+                        if ($p['video_size'] > 0) {
+                            $s = $p['video_size'];
+                            $vidSizeStr = $s >= 1048576 ? round($s / 1048576, 1) . 'MB' : round($s / 1024, 1) . 'KB';
+                        }
+                        $mediaParts = [];
+                        if ($imgCount > 0) $mediaParts[] = "{$imgCount}张图";
+                        if ($vidCount > 0) $mediaParts[] = "🎬 {$vidSizeStr}";
+                        $mediaStr = $mediaParts ? implode(' / ', $mediaParts) : '-';
+                    ?>
                     <tr>
                         <td class="col-id">#<?= $p['id'] ?></td>
                         <td class="col-small">
@@ -380,7 +498,7 @@ tbody tr:last-child td { border-bottom: none; }
                             <?= htmlspecialchars($p['nickname'] ?: $p['username']) ?>
                         </td>
                         <td><span class="content-preview"><?= htmlspecialchars(mb_substr($p['content'], 0, 120)) ?></span></td>
-                        <td class="col-small text-muted"><?= count($p['images']) ? count($p['images']) . ' 张' : '-' ?></td>
+                        <td class="col-small text-muted"><?= $mediaStr ?></td>
                         <td class="col-small"><?= $p['likes_count'] ?></td>
                         <td class="col-small"><?= $p['comments_count'] ?></td>
                         <td class="col-small text-muted"><span class="time-utc" data-utc="<?= htmlspecialchars($p['created_at']) ?>"><?= $p['created_at'] ?></span></td>
