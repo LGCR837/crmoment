@@ -591,6 +591,8 @@ function changeCover(music) {
     var blurApplied = false;
     function applyBlur() {
         if(blurApplied) return;
+        // 占位图不触发模糊背景，等真实封面加载后再设置
+        if(img === "images/music.svg") return;
         blurApplied = true;
         if(mkPlayer.mcoverbg === true && rem.isMobile) {
             $("#mobile-blur").css('background-image', 'url("' + img + '")');
@@ -603,12 +605,21 @@ function changeCover(music) {
         }
     }
 
-    // 5秒超时降级：封面未加载完成则先用默认背景
+    // 5秒超时降级：封面未加载完成则恢复默认渐变背景
     var blurTimer = setTimeout(function(){
         if(!blurApplied) {
-            rem.blurImage = "images/music.svg";
-            if(mkPlayer.coverbg === true && !rem.isMobile) {
-                $("#blur-img").backgroundBlur("images/music.svg");
+            if(img === "images/music.svg") {
+                // 占位图5秒还未被真实封面替换 → 清除模糊背景，恢复页面默认渐变
+                rem.blurImage = null;
+                if(mkPlayer.coverbg === true && !rem.isMobile) {
+                    $("#blur-img").find('.blured-img').remove();
+                }
+            } else {
+                // 真实封面5秒未加载完 → 直接模糊当前URL
+                rem.blurImage = img;
+                if(mkPlayer.coverbg === true && !rem.isMobile) {
+                    $("#blur-img").backgroundBlur(img);
+                }
             }
         }
     }, 5000);
