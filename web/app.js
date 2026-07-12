@@ -289,6 +289,49 @@ function updateAuthUI() {
     }
 }
 
+// ===== Theme Toggle (Dark / Light) =====
+const THEME_STORAGE_KEY = 'crmoment-theme';
+const logoEl = document.getElementById('app-logo');
+
+function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+    const btn = document.getElementById('btn-theme-toggle');
+    if (btn) {
+        const icon = btn.querySelector('.material-symbols-outlined');
+        if (icon) icon.textContent = theme === 'dark' ? 'dark_mode' : 'light_mode';
+    }
+    // Update logo — try dark logo first, fall back to light
+    if (logoEl) {
+        const src = theme === 'dark' ? 'crmomentlogodark.png' : 'crmomentlogo.png';
+        logoEl.src = src;
+        logoEl.onerror = function() {
+            if (this.src.includes('crmomentlogodark.png')) {
+                this.src = 'crmomentlogo.png';
+            }
+        };
+    }
+}
+
+function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+}
+
+function initTheme() {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = saved || (prefersDark ? 'dark' : 'light');
+    setTheme(theme);
+}
+
+// Theme toggle button click listener
+document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('btn-theme-toggle');
+    if (btn) btn.addEventListener('click', toggleTheme);
+});
+
 dom.btnLogin.addEventListener('click', () => {
     switchAuthMode('login');
     dialogOpen(dom.authOverlay);
@@ -1180,7 +1223,7 @@ async function renderExplore() {
     dom.main.innerHTML = `
         <div class="section-title">发现</div>
         <div style="background:var(--ba-card-bg);border-radius:var(--ba-radius-lg);padding:16px 24px 20px;border:1px solid var(--ba-card-border);box-shadow:var(--ba-card-shadow);text-align:center;margin-bottom:16px">
-            <span class="material-symbols-outlined" style="font-size:48px;color:var(--ba-blue);margin-bottom:12px;display:block">explore</span>
+            <span class="material-symbols-outlined" style="font-size:48px;color:var(--ba-accent);margin-bottom:12px;display:block">explore</span>
             <h3 style="margin-bottom:8px;color:var(--ba-text)">探索 CRMoment</h3>
             <p style="color:var(--ba-text-secondary);line-height:1.6">一个轻量的动态分享社区。<br>浏览最新动态，分享你的生活瞬间。</p>
             <div style="margin-top:20px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
@@ -1827,6 +1870,7 @@ function observeRevealElements() {
 
 // ===== Init =====
 async function init() {
+    initTheme();
     try { const user = await api('GET', '/user/me'); state.user = user; } catch (_) { state.user = null; }
     updateAuthUI();
     await renderHome();

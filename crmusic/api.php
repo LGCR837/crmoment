@@ -61,6 +61,37 @@ if(defined('CACHE_PATH') && !is_dir(CACHE_PATH)) createFolders(CACHE_PATH);
 $types = getParam('types');
 switch($types)   // 根据请求的 Api，执行相应操作
 {
+    case 'song':    // 根据歌曲ID获取歌曲详情
+        $id = getParam('id');
+
+        if($source == 'netease') {
+            $url = 'http://music.163.com/api/song/detail?ids=[' . $id . ']&id=' . $id;
+            $data = file_get_contents($url);
+            $json = json_decode($data, true);
+
+            if(isset($json['songs'][0])) {
+                $s = $json['songs'][0];
+                $result = [
+                    [
+                        'id' => (string)$s['id'],
+                        'name' => $s['name'],
+                        'artist' => [isset($s['artists'][0]['name']) ? $s['artists'][0]['name'] : '未知'],
+                        'album' => isset($s['album']['name']) ? $s['album']['name'] : '未知',
+                        'source' => 'netease',
+                        'url_id' => (string)$s['id'],
+                        'pic_id' => (string)$s['id'],
+                        'lyric_id' => (string)$s['id'],
+                    ]
+                ];
+                echojson(json_encode($result));
+            } else {
+                echojson('[]');
+            }
+        } else {
+            echojson('[]');
+        }
+        break;
+
     case 'url':   // 获取歌曲链接
         $id = getParam('id');  // 歌曲ID
         

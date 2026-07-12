@@ -35,15 +35,19 @@ rem.order = 1;
 // 音频错误处理函数
 function audioErr() {
     if(rem.playlist === undefined) return true;
-    
+
     if(rem.errCount > 10) {
         layer.msg('似乎出了点问题~播放已停止');
         rem.errCount = 0;
     } else {
         rem.errCount++;
-        layer.msg('当前歌曲播放失败，自动播放下一首');
-        nextMusic();
-    } 
+        if(rem.order === 1) {
+            layer.msg('当前歌曲播放失败');
+        } else {
+            layer.msg('当前歌曲播放失败，自动播放下一首');
+            nextMusic();
+        }
+    }
 }
 
 // 点击暂停按钮的事件
@@ -162,7 +166,7 @@ function updateProgress(){
 
 function listClick(no) {
     var tmpid = no;
-    
+
     // 判断点击的歌曲是否正在播放，是则跳过
     if(rem.playlist !== undefined && rem.playid !== undefined) {
         var clickMusic = musicList[rem.dislist].item[no];
@@ -174,19 +178,28 @@ function listClick(no) {
             return false;
         }
     }
-    
+
     if(mkPlayer.debug) {
         console.log("点播了列表中的第 " + (no + 1) + " 首歌 " + musicList[rem.dislist].item[no].name);
     }
-    
+
+    // 立即显示歌曲信息（不等音频加载）
+    var previewMusic = musicList[rem.dislist].item[no];
+    $("#now-playing-title").text(previewMusic.name);
+    $("#now-playing-artist").text(previewMusic.artist);
+
+    // 立即高亮列表项
+    $(".list-playing").removeClass("list-playing");
+    $(".list-item[data-no='" + no + "']").addClass("list-playing");
+
     if(rem.dislist === 0) {
         if(rem.playlist === undefined) {
             rem.playlist = 1;
             rem.playid = musicList[1].item.length - 1;
         }
-        
+
         var tmpMusic = musicList[0].item[no];
-        
+
         for(var i=0; i<musicList[1].item.length; i++) {
             if(musicList[1].item[i].id == tmpMusic.id && musicList[1].item[i].source == tmpMusic.source) {
                 tmpid = i;
@@ -194,7 +207,7 @@ function listClick(no) {
                 return true;
             }
         }
-        
+
         musicList[1].item.splice(rem.playid + 1, 0, tmpMusic);
         tmpid = rem.playid + 1;
         playerSavedata('playing', musicList[1].item);
@@ -206,7 +219,7 @@ function listClick(no) {
             refreshSheet();
         }
     }
-    
+
     playList(tmpid);
     return true;
 }
@@ -287,13 +300,19 @@ function vBcallback(newVal) {
     if(rem.audio[0] !== undefined) {
         rem.audio[0].volume = newVal;
     }
-    
-    if($(".btn-quiet").is('.btn-state-quiet')) {
-        $(".btn-quiet").removeClass("btn-state-quiet");
+
+    var $btn = $(".btn-quiet");
+
+    if(newVal === 0) {
+        $btn.addClass("btn-state-quiet");
+        $btn.find('.icon-volume-on').hide();
+        $btn.find('.icon-volume-off').show();
+    } else {
+        $btn.removeClass("btn-state-quiet");
+        $btn.find('.icon-volume-on').show();
+        $btn.find('.icon-volume-off').hide();
     }
-    
-    if(newVal === 0) $(".btn-quiet").addClass("btn-state-quiet");
-    
+
     playerSavedata('volume', newVal);
 }
 
@@ -339,16 +358,32 @@ mkpgb.prototype = {
         $("html").mouseup(function(e){
             mdown = false;
         });
-        
+        $(mk.bar).on("touchstart", function(e){
+            if(!mk.locked) mdown = true;
+            barMove(e);
+        });
+        $("html").on("touchmove", function(e){
+            if(mdown) barMove(e);
+        });
+        $("html").on("touchend", function(e){
+            mdown = false;
+        });
+
         function barMove(e) {
             if(!mdown) return;
+            var clientX;
+            if(e.originalEvent && e.originalEvent.touches) {
+                clientX = e.originalEvent.touches[0].clientX;
+            } else {
+                clientX = e.clientX;
+            }
             var percent = 0;
-            if(e.clientX < mk.minLength){ 
+            if(clientX < mk.minLength){ 
                 percent = 0; 
-            }else if(e.clientX > mk.maxLength){ 
+            }else if(clientX > mk.maxLength){ 
                 percent = 1;
             }else{  
-                percent = (e.clientX - mk.minLength) / (mk.maxLength - mk.minLength);
+                percent = (clientX - mk.minLength) / (mk.maxLength - mk.minLength);
             }
             mk.callback(percent);
             mk.goto(percent);

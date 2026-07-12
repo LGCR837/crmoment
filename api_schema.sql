@@ -141,3 +141,42 @@ CREATE TABLE IF NOT EXISTS `notifications` (
     FOREIGN KEY (`actor_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`post_id`) REFERENCES `posts`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 用户音乐数据云同步表
+CREATE TABLE IF NOT EXISTS `user_music_data` (
+    `user_id` INT UNSIGNED NOT NULL,
+    `data_key` VARCHAR(50) NOT NULL COMMENT '数据键名: his, playing, volume',
+    `data_value` MEDIUMTEXT NOT NULL COMMENT 'JSON 数据',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`user_id`, `data_key`),
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 用户自定义歌单表
+CREATE TABLE IF NOT EXISTS `user_playlists` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `user_id` INT UNSIGNED NOT NULL,
+    `name` VARCHAR(100) NOT NULL,
+    `cover` VARCHAR(500) DEFAULT NULL,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX `idx_user_id` (`user_id`),
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 歌单歌曲表
+CREATE TABLE IF NOT EXISTS `playlist_tracks` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `playlist_id` INT UNSIGNED NOT NULL,
+    `crmid` VARCHAR(20) NOT NULL COMMENT '歌曲唯一标识，如 N123456',
+    `source` ENUM('netease','kugou','tencent') NOT NULL,
+    `track_id` VARCHAR(50) NOT NULL COMMENT '原始音乐平台ID',
+    `name` VARCHAR(200) NOT NULL COMMENT '歌曲名（缓存）',
+    `artist` VARCHAR(200) DEFAULT NULL COMMENT '歌手（缓存）',
+    `album` VARCHAR(200) DEFAULT NULL COMMENT '专辑（缓存）',
+    `sort_order` INT UNSIGNED DEFAULT 0,
+    `added_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY `uk_playlist_crmid` (`playlist_id`, `crmid`),
+    INDEX `idx_playlist_id` (`playlist_id`),
+    FOREIGN KEY (`playlist_id`) REFERENCES `user_playlists`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

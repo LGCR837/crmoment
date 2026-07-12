@@ -525,8 +525,8 @@ async function api(method, path, body = null)
 | `music` | 是 | 音频直链 |
 | `lrc` | 是 | 歌词文件直链 |
 | `bg` | 否 | 背景图片直链 |
-| `pos` | 否 | 歌词位置：left/center(默认)/right/none |
-| `color` | 否 | 歌词颜色：light(默认)/dark |
+| `lrc_pos` | 否 | 歌词位置：left/center(默认)/right |
+| `lrc_color` | 否 | 歌词颜色：light(默认)/dark |
 
 ### 8.3 歌词位置实现
 

@@ -75,3 +75,30 @@ function handleNotificationsRead(): void {
 
     success(null, '已全部标记为已读');
 }
+
+/**
+ * POST /notifications/read   (单条标记已读)
+ */
+function handleNotificationsReadOne(): void {
+    assertMethod('POST');
+
+    // 先读取 php://input（只能读取一次），提取 id 和 token
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $notifId = isset($input['id']) ? (int)$input['id'] : 0;
+    if ($notifId <= 0) {
+        error('缺少通知 ID');
+    }
+
+    // 手动验证 token（避免 getTokenFromRequest 重复消费 php://input）
+    $token = $input['token'] ?? '';
+    $userId = validateToken($token);
+    if (!$userId) {
+        error('登录已过期，请重新登录', 401);
+    }
+
+    $pdo  = getDB();
+    $stmt = $pdo->prepare('UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?');
+    $stmt->execute([$notifId, $userId]);
+
+    success(null, '已标记为已读');
+}

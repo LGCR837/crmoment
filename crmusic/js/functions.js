@@ -32,11 +32,20 @@ $(function(){
     rem.webTitle  = document.title;
     rem.errCount  = 0;
     rem.userAgent = navigator.userAgent;
-    
+    rem.blurImage = null;
+    rem._resizeTimer = null;
+
     window.onresize = function () {
         rem.isMobile = isMobile.any();
         if (navigator.userAgent !== rem.userAgent) {
             location.reload();
+            return;
+        }
+        if (rem.blurImage && mkPlayer.coverbg && !rem.isMobile) {
+            clearTimeout(rem._resizeTimer);
+            rem._resizeTimer = setTimeout(function() {
+                $("#blur-img").backgroundBlur(rem.blurImage);
+            }, 300);
         }
     }
 
@@ -73,37 +82,48 @@ $(function(){
                 dataBox("sheet");
             break;
             case "search":
-                // 回到搜索状态
-                dataBox("list");
-                if(rem.wd && rem.wd.trim() !== '') {
-                    $(".btn[data-action='search']").show();
-                }
+                loadList(0);
+                $(".btn[data-action='search']").show();
             break;
         }
     });
     
     // ========== 内联搜索框逻辑 ==========
-    var searchTimer = null;
+    var isComposing = false;
+    $('#search-wd-inline').on('compositionstart', function() {
+        isComposing = true;
+    }).on('compositionend', function() {
+        isComposing = false;
+        // 中文输入法确认后，如果有值则自动搜索
+        var val = $(this).val().trim();
+        if (val.length > 0) {
+            doSearch();
+        }
+    });
     $('#search-wd-inline').on('keydown', function(e) {
-        if (e.keyCode === 13) {  // 回车搜索
-            var wd = $(this).val().trim();
-            if (!wd) return;
-            rem.source = $('#source-inline').val();
-            rem.loadPage = 1;
-            rem.wd = wd;
-            ajaxSearch();
+        if (e.keyCode === 13) {  // 回车搜索（PC端和手机端搜索键）
+            e.preventDefault();
+            // 等待 compositionend 处理（中文输入法场景）
+            if (!isComposing) {
+                doSearch();
+            }
         }
     });
     $('#source-inline').on('change', function() {
-        // 切换源后如果有搜索词则重新搜索
         var wd = $('#search-wd-inline').val().trim();
         if (wd) {
-            rem.source = $(this).val();
-            rem.loadPage = 1;
-            rem.wd = wd;
-            ajaxSearch();
+            doSearch();
         }
     });
+    
+    function doSearch() {
+        var wd = $('#search-wd-inline').val().trim();
+        if (!wd) return;
+        rem.source = $('#source-inline').val();
+        rem.loadPage = 1;
+        rem.wd = wd;
+        ajaxSearch();
+    }
     
     // 文字溢出悬浮提示
     var $tooltip = $("#list-tooltip");
@@ -165,13 +185,25 @@ $(function(){
         if(isNaN(num)) return false;
         if(!$(this).data("loadmenu")) {
             var target = $(this).find(".music-name");
-            var html = '<span class="music-name-cult">' + 
-            target.html() + 
+            var isLoggedIn = !!localStorage.getItem('crmoment-token');
+            var isOwnerPlaylist = isLoggedIn && rem.dislist !== undefined && musicList[rem.dislist] && musicList[rem.dislist].userPlaylist;
+            var addPlaylistBtn = isLoggedIn ?
+                '<span class="list-icon icon-add-playlist" data-function="addPlaylist" title="添加到歌单">' +
+                    '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
+                '</span>' : '';
+            var deleteBtn = isOwnerPlaylist ?
+                '<span class="list-icon icon-remove-track" data-function="removeTrack" title="从歌单删除">' +
+                    '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>' +
+                '</span>' : '';
+            var html = '<span class="music-name-cult">' +
+            target.html() +
             '</span>' +
             '<div class="list-menu" data-no="' + num + '">' +
                 '<span class="list-icon icon-download" title="下载">' +
                     '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
                 '</span>' +
+                addPlaylistBtn +
+                deleteBtn +
                 '<span class="list-icon icon-share" data-function="share" title="分享">' +
                     '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>' +
                 '</span>' +
@@ -182,12 +214,43 @@ $(function(){
     });
     
     // 列表中的菜单点击
-    $(".music-list").on("click",".icon-download,.icon-share", function() {
+    $(".music-list").on("click",".icon-download,.icon-share,.icon-add-playlist,.icon-remove-track", function() {
         var num = parseInt($(this).parent().data("no"));
         if(isNaN(num)) return false;
         switch($(this).data("function")) {
             case "share":
                 ajaxUrl(musicList[rem.dislist].item[num], ajaxShare);
+            break;
+            case "addPlaylist":
+                var music = musicList[rem.dislist].item[num];
+                if (typeof userPlaylists !== 'undefined') {
+                    userPlaylists.showAddModal(music);
+                }
+            break;
+            case "removeTrack":
+                var track = musicList[rem.dislist].item[num];
+                var playlist = musicList[rem.dislist];
+                layer.open({
+                    title: '确认删除',
+                    shade: [0.3,'rgba(0,0,0,0.3)'],
+                    shadeClose: true,
+                    closeBtn: 0,
+                    anim: 0,
+                    isOutAnim: true,
+                    content: '确定要将 <b>' + track.name + '</b> 从歌单中移除吗？',
+                    btn: ['移除', '取消'],
+                    yes: function(idx){
+                        if (typeof userPlaylists !== 'undefined') {
+                            var crmid = track.crmid || (track.source.charAt(0).toUpperCase() + track.id);
+                            userPlaylists.removeTrack(playlist.id, crmid, function(){
+                                playlist.item.splice(num, 1);
+                                loadList(rem.dislist);
+                                layer.msg('已移除');
+                            });
+                        }
+                        layer.close(idx);
+                    }
+                });
             break;
         }
         return true;
@@ -203,7 +266,16 @@ $(function(){
     // 点击专辑显示专辑歌曲
     $("#sheet").on("click",".sheet-cover,.sheet-name", function() {
         var num = parseInt($(this).parent().data("no"));
-        if(musicList[num].item.length === 0 && musicList[num].creatorID) {
+        if(musicList[num].userPlaylist) {
+            // 用户自定义歌单 - 从服务器加载
+            if(musicList[num].item.length === 0) {
+                layer.msg('列表读取中...', {icon: 16,shade: [0.25,,'#000'],shadeClose: true,time: 500});
+                if (typeof userPlaylists !== 'undefined') {
+                    userPlaylists.loadTracks(num, loadList);
+                }
+                return true;
+            }
+        } else if(musicList[num].item.length === 0 && musicList[num].id) {
             layer.msg('列表读取中...', {icon: 16,shade: [0.25,,'#000'],shadeClose: true,time: 500});
             ajaxPlayList(musicList[num].id, num, loadList);
             return true;
@@ -239,13 +311,18 @@ $(function(){
     });
     
     // 静音
-    $(".btn-quiet").click(function(){
+    $(".btn-quiet").click(function(e){
+        e.stopPropagation();
+        if(rem.isMobile) {
+            var $vol = $(this).closest('.vol').find('.volume');
+            $vol.toggleClass('volume-show');
+            return;
+        }
         var oldVol;
         if($(this).is('.btn-state-quiet')) {
             oldVol = $(this).data("volume");
-            oldVol = oldVol? oldVol: (rem.isMobile? 1: mkPlayer.volume);
+            oldVol = oldVol? oldVol: mkPlayer.volume;
             $(this).removeClass("btn-state-quiet");
-            // 显示有声音图标
             $(this).find('.icon-volume-on').show();
             $(this).find('.icon-volume-off').hide();
         } else {
@@ -253,7 +330,6 @@ $(function(){
             $(this).addClass("btn-state-quiet");
             $(this).data("volume", oldVol);
             oldVol = 0;
-            // 显示静音图标
             $(this).find('.icon-volume-on').hide();
             $(this).find('.icon-volume-off').show();
         }
@@ -261,20 +337,25 @@ $(function(){
         volume_bar.goto(oldVol);
         if(rem.audio[0] !== undefined) rem.audio[0].volume = oldVol;
     });
-    
+
+    // 移动端点击外部关闭音量弹窗
+    $(document).on('click', function(){
+        if(rem.isMobile) {
+            $('.volume-show').removeClass('volume-show');
+        }
+    });
+
     // 封面背景
     if((mkPlayer.coverbg === true && !rem.isMobile) || (mkPlayer.mcoverbg === true && rem.isMobile)) {
         if(rem.isMobile) {
-            $('#blur-img').html('<div class="blured-img" id="mobile-blur"></div><div class="blur-mask mobile-mask"></div>');
+            $('#blur-img').html('<div class="blured-img" id="mobile-blur"></div>');
         } else {
             $('#blur-img').backgroundBlur({
                 blurAmount : 40,
                 imageClass : 'blured-img',
-                overlayClass : 'blur-mask',
                 endOpacity : 1
             });
         }
-        $('.blur-mask').fadeIn(1000);
     }
     
     // 图片加载失败处理
@@ -285,8 +366,12 @@ $(function(){
     setInterval(function () {
         $('.audio-time').text(getAudioTime());
     }, 1000);
-    
-    initList();
+
+    if (localStorage.getItem('crmoment-token')) {
+        cloudSyncLoad(function() { initList(); });
+    } else {
+        initList();
+    }
 });
 
 // 播放时长处理函数
@@ -295,7 +380,7 @@ function getAudioTime () {
     var duration = audio.duration;
     var currentTime = audio.currentTime;
     if (duration && currentTime) {
-        return (formatTime(duration) + '/' + formatTime(currentTime));
+        return (formatTime(currentTime) + '/' + formatTime(duration));
     } else {
         return '00:00/00:00';
     }
@@ -304,9 +389,13 @@ function getAudioTime () {
 // 歌曲信息
 function musicInfo(list, index) {
     var music = musicList[list].item[index];
-    var tempStr = '<span class="info-title">歌名：</span>' + music.name + 
-    '<br><span class="info-title">歌手：</span>' + music.artist + 
+    var tempStr = '<span class="info-title">歌名：</span>' + music.name +
+    '<br><span class="info-title">歌手：</span>' + music.artist +
     '<br><span class="info-title">专辑：</span>' + music.album;
+    if (typeof CRMID !== 'undefined') {
+        var crmid = CRMID.toCrmid(music.source, music.id);
+        if (crmid) tempStr += '<br><span class="info-title">CRMID：</span>' + crmid;
+    }
     
     if(list == rem.playlist && index == rem.playid) {
         tempStr += '<br><span class="info-title">时长：</span>' + formatTime(rem.audio[0].duration);
@@ -456,17 +545,19 @@ function download(music) {
 
 // 获取外链的ajax回调
 function ajaxShare(music) {
-    if(music.url == 'err' || music.url == "" || music.url == null) {
-        layer.msg('这首歌不支持外链获取');
+    var crmid = CRMID.toCrmid(music.source, music.id);
+    if (!crmid) {
+        layer.msg('该来源暂不支持分享');
         return;
     }
-    
-    var tmpHtml = '<p>' + music.artist + ' - ' + music.name + ' 的外链地址为：</p>' + 
-    '<input class="share-url" onmouseover="this.focus();this.select()" value="' + music.url + '">' + 
-    '<p class="share-tips">* 获取到的音乐外链有效期较短，请按需使用。</p>';
-    
+    var shareUrl = CRMID.getShareUrl(crmid);
+    var tmpHtml = '<p>' + music.artist + ' - ' + music.name + '</p>' +
+    '<p style="margin:6px 0;font-size:13px;color:#8a9db0">CRMID: ' + crmid + '</p>' +
+    '<input class="share-url" onmouseover="this.focus();this.select()" value="' + shareUrl + '">' +
+    '<p class="share-tips">* 复制链接分享给好友，打开即可自动播放。</p>';
+
     layer.open({
-        title: '歌曲外链分享',
+        title: '分享歌曲',
         shade: [0.3,'rgba(0,0,0,0.3)'],
         shadeClose: true,
         closeBtn: 0,
@@ -479,42 +570,95 @@ function ajaxShare(music) {
 // 改变右侧封面图像
 function changeCover(music) {
     var img = music.pic;
-    var animate = false, imgload = false;
-    
+
     if(!img) {
         ajaxPic(music, changeCover);
         img = "err";
     }
-    
+
     if(img == "err") {
         img = "images/music.svg";
-    } else {
-        if(mkPlayer.mcoverbg === true && rem.isMobile) {    
-            $("#music-cover").load(function(){
-                $("#mobile-blur").css('background-image', 'url("' + img + '")');
-            });
-        } else if(mkPlayer.coverbg === true && !rem.isMobile) { 
-            $("#music-cover").load(function(){
-                if(animate) {
-                    $("#blur-img").backgroundBlur(img);
-                    $("#blur-img").animate({opacity:"1"}, 2000);
-                } else {
-                    imgload = true;
-                }
-            });
-            $("#blur-img").animate({opacity: "0.2"}, 1000, function(){
-                if(imgload) {
-                    $("#blur-img").backgroundBlur(img);
-                    $("#blur-img").animate({opacity:"1"}, 2000);
-                } else {
-                    animate = true;
-                }
+    }
+
+    $("#music-cover").attr("src", img);
+    $(".sheet-item[data-no='1'] .sheet-cover").attr('src', img);
+
+    if(img != "images/music.svg") {
+        adaptTextForCover(img);
+    }
+
+    // 更新模糊背景
+    var blurApplied = false;
+    function applyBlur() {
+        if(blurApplied) return;
+        blurApplied = true;
+        if(mkPlayer.mcoverbg === true && rem.isMobile) {
+            $("#mobile-blur").css('background-image', 'url("' + img + '")');
+        } else if(mkPlayer.coverbg === true && !rem.isMobile) {
+            rem.blurImage = img;
+            $("#blur-img").animate({opacity: "0.2"}, 300, function(){
+                $("#blur-img").backgroundBlur(img);
+                $("#blur-img").animate({opacity: "1"}, 1500);
             });
         }
     }
-    
-    $("#music-cover").attr("src", img);
-    $(".sheet-item[data-no='1'] .sheet-cover").attr('src', img);
+
+    // 5秒超时降级：封面未加载完成则先用默认背景
+    var blurTimer = setTimeout(function(){
+        if(!blurApplied) {
+            rem.blurImage = "images/music.svg";
+            if(mkPlayer.coverbg === true && !rem.isMobile) {
+                $("#blur-img").backgroundBlur("images/music.svg");
+            }
+        }
+    }, 5000);
+
+    var coverImg = document.getElementById('music-cover');
+    if(coverImg && coverImg.complete) {
+        clearTimeout(blurTimer);
+        applyBlur();
+    } else {
+        $("#music-cover").one('load', function(){
+            clearTimeout(blurTimer);
+            applyBlur();
+        });
+    }
+}
+
+// 根据封面图亮度自动切换文字颜色（无遮罩）
+function adaptTextForCover(imgUrl) {
+    var root = document.documentElement;
+    var img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = function() {
+        try {
+            var c = document.createElement('canvas');
+            var ctx = c.getContext('2d');
+            c.width = 40; c.height = 40;
+            ctx.drawImage(img, 0, 0, 40, 40);
+            var d = ctx.getImageData(0, 0, 40, 40).data;
+            var r = 0, g = 0, b = 0, n = d.length / 4;
+            for(var i = 0; i < d.length; i += 4) {
+                r += d[i]; g += d[i+1]; b += d[i+2];
+            }
+            r /= n; g /= n; b /= n;
+            var lum = 0.299 * r + 0.587 * g + 0.114 * b;
+            if(lum > 128) {
+                root.style.setProperty('--text-primary', '#1a1a1a');
+                root.style.setProperty('--text-secondary', '#333333');
+                root.style.setProperty('--text-muted', '#555555');
+                root.style.setProperty('--accent', '#2196F3');
+            } else {
+                root.style.setProperty('--text-primary', '#f0f0f0');
+                root.style.setProperty('--text-secondary', '#d0d0d0');
+                root.style.setProperty('--text-muted', '#a0a0a0');
+                root.style.setProperty('--accent', '#64B5F6');
+            }
+        } catch(e) {
+            // CORS 拒绝像素读取，保持 CSS 默认颜色
+        }
+    };
+    img.src = imgUrl;
 }
 
 // 加载播放列表
@@ -523,19 +667,36 @@ function loadList(list) {
         layer.msg('列表读取中...', {icon: 16,shade: [0.25,,'#000'],time: 500});
         return true;
     }
-    
+
+    // 如果是用户自定义歌单且歌曲为空，先从服务器加载
+    if(musicList[list].userPlaylist && musicList[list].item.length === 0 && musicList[list].id) {
+        if (typeof userPlaylists !== 'undefined') {
+            userPlaylists.loadTracks(list, function(loadedIndex) {
+                loadList(loadedIndex);
+            });
+            return true;
+        }
+    }
+
     rem.dislist = list;
     dataBox("list");
-    
+
     if(mkPlayer.debug) {
         if(musicList[list].id) {
             console.log('加载播放列表 ' + list + ' - ' + musicList[list].name);
         }
     }
-    
+
     rem.mainList.html('');
     addListhead();
-    
+
+    // 用户歌单添加拖拽类
+    if (musicList[list].userPlaylist) {
+        rem.mainList.addClass('user-playlist-track');
+    } else {
+        rem.mainList.removeClass('user-playlist-track');
+    }
+
     if(musicList[list].item.length == 0) {
         addListbar("nodata");
     } else {
@@ -544,18 +705,23 @@ function loadList(list) {
             addItem(i + 1, tmpMusic.name, tmpMusic.artist, tmpMusic.album);
             if(list == 1 || list == 2) tmpMusic.url = "";
         }
-        
-        if(list == 1 || list == 2) {
+
+        if(list == 1) {
             addListbar("clear");
         }
-        
+
         if(rem.playlist === undefined) {
             if(mkPlayer.autoplay == true) pause();
         } else {
             refreshList();
         }
-        
+
         listToTop();
+    }
+
+    // 用户歌单启用拖拽排序
+    if (musicList[list].userPlaylist && typeof userPlaylists !== 'undefined') {
+        userPlaylists.enableDragSort();
     }
 }
 
@@ -713,7 +879,7 @@ function dataBox(choose) {
 
 function addHis(music) {
     if(rem.playlist == 2) return true;
-    if(musicList[2].item.length > 300) musicList[2].item.length = 299;
+    if(musicList[2].item.length > 50) musicList[2].item.length = 49;
     if(music.id !== undefined && music.id !== '') {
         for(var i=0; i<musicList[2].item.length; i++) {
             if(musicList[2].item[i].id == music.id && musicList[2].item[i].source == music.source) {
@@ -727,13 +893,6 @@ function addHis(music) {
 }
 
 function initList() {
-    if(playerReaddata('uid')) {
-        rem.uid = playerReaddata('uid');
-        rem.uname = playerReaddata('uname');
-        var tmp_ulist = playerReaddata('ulist');
-        if(tmp_ulist) musicList.push.apply(musicList, tmp_ulist);
-    }
-    
     for(var i=1; i<musicList.length; i++) {
         if(i == 1) {
             var tmp_item = playerReaddata('playing');
@@ -746,35 +905,19 @@ function initList() {
             if(tmp_item) {
                 musicList[2].item = tmp_item;
             }
-        } else if(!musicList[i].creatorID && (musicList[i].item == undefined || (i>2 && musicList[i].item.length == 0))) {
+        } else if(musicList[i].item == undefined || (i>2 && musicList[i].item.length == 0)) {
             musicList[i].item = [];
-            if(musicList[i].id) {
-                ajaxPlayList(musicList[i].id, i);
-            } else {
-                if(!musicList[i].name) musicList[i].name = '未命名';
-            }
         }
         addSheet(i, musicList[i].name, musicList[i].cover);
     }
-    
-    if(playerReaddata('uid') && !tmp_ulist) {
-        ajaxUserList(rem.uid);
-        return true;
-    }
-    
+
     if(mkPlayer.defaultlist >= musicList.length) mkPlayer.defaultlist = 1;
     if(musicList[mkPlayer.defaultlist].isloading !== true) loadList(mkPlayer.defaultlist);
-}
 
-function clearUserlist() {
-    if(!rem.uid) return false;
-    for(var i=1; i<musicList.length; i++) {
-        if(musicList[i].creatorID !== undefined && musicList[i].creatorID == rem.uid) break;
+    // 加载用户自定义歌单
+    if (typeof userPlaylists !== 'undefined') {
+        userPlaylists.load();
     }
-    musicList.splice(i, musicList.length - i);
-    musicList.length = i;
-    clearSheet();
-    initList();
 }
 
 function clearDislist() {
@@ -811,10 +954,14 @@ function refreshSheet() {
 }
 
 function playerSavedata(key, data) {
+    var rawKey = key;
     key = 'mkPlayer2_' + key;
-    data = JSON.stringify(data);
+    var raw = JSON.stringify(data);
     if (window.localStorage) {
-        localStorage.setItem(key, data);    
+        localStorage.setItem(key, raw);
+    }
+    if (['his', 'playing', 'volume'].indexOf(rawKey) !== -1) {
+        cloudSyncSave(rawKey, data);
     }
 }
 
@@ -823,3 +970,157 @@ function playerReaddata(key) {
     key = 'mkPlayer2_' + key;
     return JSON.parse(localStorage.getItem(key));
 }
+
+var _cloudSyncTimers = {};
+function cloudSyncSave(key, data) {
+    if (!localStorage.getItem('crmoment-token')) return;
+    if (_cloudSyncTimers[key]) clearTimeout(_cloudSyncTimers[key]);
+    _cloudSyncTimers[key] = setTimeout(function() {
+        var syncData = data;
+        if ((key === 'his' || key === 'playing') && Array.isArray(data)) {
+            syncData = data.map(function(item) {
+                var clean = {};
+                for (var k in item) {
+                    if (k !== 'url') clean[k] = item[k];
+                }
+                return clean;
+            });
+        }
+        $.ajax({
+            url: 'api_music_sync.php',
+            method: 'POST',
+            data: { action: 'save', key: key, data: JSON.stringify(syncData), token: localStorage.getItem('crmoment-token') },
+            dataType: 'json'
+        });
+    }, 2000);
+}
+
+function cloudSyncLoad(callback) {
+    var token = localStorage.getItem('crmoment-token');
+    if (!token) { callback(); return; }
+    var keys = ['his', 'playing', 'volume'];
+    var pending = keys.length;
+    var done = function() { if (--pending <= 0) callback(); };
+    keys.forEach(function(key) {
+        $.ajax({
+            url: 'api_music_sync.php',
+            method: 'GET',
+            data: { action: 'read', key: key, token: token },
+            dataType: 'json',
+            success: function(res) {
+                if (res.code === 0 && res.data) {
+                    var localRaw = localStorage.getItem('mkPlayer2_' + key);
+                    var localData = localRaw ? JSON.parse(localRaw) : null;
+                    var cloudValue = res.data.value;
+                    if (key === 'volume') {
+                        if (cloudValue !== null && cloudValue !== undefined) {
+                            localStorage.setItem('mkPlayer2_' + key, JSON.stringify(cloudValue));
+                        }
+                    } else {
+                            if (cloudValue && Array.isArray(cloudValue)) {
+                            var merged = cloudValue.slice();
+                            if (localData && Array.isArray(localData)) {
+                                localData.forEach(function(item) {
+                                    var exists = merged.some(function(m) {
+                                        return m.id === item.id && m.source === item.source;
+                                    });
+                                    if (!exists) merged.push(item);
+                                });
+                            }
+                            if (key === 'his' && merged.length > 50) merged.length = 50;
+                            localStorage.setItem('mkPlayer2_' + key, JSON.stringify(merged));
+                        }
+                    }
+                }
+                done();
+            },
+            error: function() { done(); }
+        });
+    });
+}
+
+function checkLoginStatus() {
+    const token = localStorage.getItem('crmoment-token');
+    const cachedUser = localStorage.getItem('crmoment-user');
+    const loginLink = document.getElementById('login-link');
+    const userInfo = document.getElementById('user-info');
+    const userName = document.getElementById('user-name');
+
+    if (token) {
+        loginLink.style.display = 'none';
+        
+        if (cachedUser) {
+            try {
+                const user = JSON.parse(cachedUser);
+                userName.textContent = user.nickname || user.username;
+                userInfo.style.display = 'inline';
+            } catch (e) {}
+        }
+        
+        fetch('api_checktoken.php?token=' + encodeURIComponent(token))
+            .then(res => res.json())
+            .then(data => {
+                if (data.code === 0) {
+                    const user = data.data;
+                    userName.textContent = user.nickname || user.username;
+                    userInfo.style.display = 'inline';
+                    localStorage.setItem('crmoment-user', JSON.stringify(user));
+                } else {
+                    localStorage.removeItem('crmoment-token');
+                    localStorage.removeItem('crmoment-user');
+                    loginLink.style.display = 'inline';
+                    userInfo.style.display = 'none';
+                }
+            })
+            .catch(() => {
+                if (!cachedUser) {
+                    loginLink.style.display = 'inline';
+                    userInfo.style.display = 'none';
+                }
+            });
+    } else {
+        loginLink.style.display = 'inline';
+        userInfo.style.display = 'none';
+    }
+}
+
+function handleLoginClick() {
+    const loginLink = document.getElementById('login-link');
+    if (loginLink) {
+        loginLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            const redirectUrl = window.location.protocol + '//' + window.location.host + '/readtoken.php';
+            const authUrl = 'https://crmoment.ccwu.cc/auth.php?url=' + encodeURIComponent(redirectUrl);
+            window.location.href = authUrl;
+        });
+    }
+}
+
+function processTokenFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    const userParam = urlParams.get('user');
+    
+    if (token) {
+        localStorage.setItem('crmoment-token', token);
+        if (userParam) {
+            try {
+                const user = JSON.parse(decodeURIComponent(userParam));
+                localStorage.setItem('crmoment-user', JSON.stringify(user));
+            } catch (e) {}
+        }
+        urlParams.delete('token');
+        urlParams.delete('user');
+        const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+        window.history.replaceState({}, document.title, newUrl);
+    }
+}
+
+$(document).ready(function() {
+    processTokenFromUrl();
+    checkLoginStatus();
+    handleLoginClick();
+    if (typeof CRMID !== 'undefined') {
+        setTimeout(function() { CRMID.handleHash(); }, 500);
+    }
+});

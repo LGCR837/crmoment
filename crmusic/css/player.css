@@ -57,6 +57,7 @@ a:focus, button:focus, input:focus {
 /* Win11 风格圆角变量 - Blue Archive Theme */
 :root {
     color-scheme: light only;
+    transition: color 0.5s ease, background-color 0.5s ease;
     --radius-sm: 4px;
     --radius-md: 6px;
     --radius-lg: 8px;
@@ -64,6 +65,7 @@ a:focus, button:focus, input:focus {
     --bg-secondary: #e4ecf2;
     --bg-card: rgba(255, 255, 255, 0.55);
     --bg-hover: rgba(126, 200, 227, 0.12);
+    --bg-active: rgba(126, 200, 227, 0.22);
     --text-primary: #4a6075;
     --text-secondary: #5a6f84;
     --text-muted: #8a9db0;
@@ -114,19 +116,17 @@ body {
     background-position: center center;
     background-repeat: no-repeat;
 }
-/* 图像遮罩层 - 浅色半透明 */
+/* 图像遮罩层 - 半透明 */
 .blur-mask {
     display: none;
     position: absolute;
     width: 100%;
     height: 100%;
-    background-color: #e8f0f6;
-    filter:alpha(opacity=75);
-    -moz-opacity:0.75;
-    opacity:0.75;
+    background-color: transparent;
     top: 0;
     left: 0;
     overflow: hidden;
+    transition: background-color 0.5s ease, opacity 0.5s ease;
 }
 
 .mobile-mask {
@@ -196,6 +196,7 @@ body {
     flex-shrink: 1;
     min-width: 0;
     cursor: text;
+    box-sizing: border-box;
 }
 .search-inline:focus-within {
     border-color: var(--accent);
@@ -224,13 +225,14 @@ body {
     color: var(--text-secondary);
     border: 2px solid rgba(150, 170, 190, 0.3);
     border-radius: 10px;
-    padding: 0 8px;
+    padding: 0 10px;
     height: 34px;
     font-size: 13px;
     cursor: pointer;
     outline: none;
     font-family: inherit;
     appearance: auto;
+    box-sizing: border-box;
 }
 .source-select select:hover {
     border-color: var(--border-light);
@@ -353,11 +355,15 @@ body {
     border-bottom: 1px solid var(--border-subtle);
     cursor: pointer;
     position: relative;
-    transition: background 0.15s ease;
+    transition: background 0.2s ease, transform 0.2s ease;
     border-radius: var(--radius-sm);
 }
 .list-item:hover {
     background: var(--bg-hover);
+}
+.list-item:active {
+    background: var(--bg-active);
+    transform: scale(0.985);
 }
 
 /* 正在播放的那项 */
@@ -471,6 +477,10 @@ body {
 .list-icon:hover {
     color: var(--accent);
     background: rgba(126, 200, 227, 0.15);
+}
+.icon-remove-track:hover {
+    color: #e05555 !important;
+    background: rgba(224, 85, 85, 0.12) !important;
 }
 .list-playing .icon-play{
     display: none;
@@ -610,7 +620,7 @@ body {
     text-align: center;
     color: var(--text-secondary);
     line-height: 30px;
-    padding: 20px 0;
+    padding: 10px 0 5px 0;
 }
 #lyric {
     position: absolute;
@@ -860,26 +870,18 @@ body {
 @keyframes dot-move{0%{box-shadow: 0 0 4px var(--accent);}50%{box-shadow: 0 0 12px var(--accent);}100%{box-shadow: 0 0 4px var(--accent);}}
 
 /* ========== layui layer 弹窗 - Blue Archive 风格 ========== */
-/* 平滑退出动画 - 覆盖 layui 默认的回弹动画 */
-.layer-anim-close {
-    -webkit-animation-name: layer-smoothFadeOut !important;
-    animation-name: layer-smoothFadeOut !important;
-    -webkit-animation-duration: 0.25s !important;
-    animation-duration: 0.25s !important;
-}
-@-webkit-keyframes layer-smoothFadeOut {
-    0% { opacity: 1; transform: scale(1); }
-    100% { opacity: 0; transform: scale(0.96); }
-}
-@keyframes layer-smoothFadeOut {
-    0% { opacity: 1; transform: scale(1); }
-    100% { opacity: 0; transform: scale(0.96); }
-}
 /* 入场也改为平滑 */
 .layui-layer.layer-anim-00,
 .layui-layer.layer-anim {
     -webkit-animation-name: layer-smoothFadeIn !important;
     animation-name: layer-smoothFadeIn !important;
+    -webkit-animation-duration: 0.25s !important;
+    animation-duration: 0.25s !important;
+}
+/* 平滑退出动画 - 优先级要高于入场规则，否则关闭时 layer-anim 会覆盖 close */
+.layui-layer.layer-anim-close {
+    -webkit-animation-name: layer-smoothFadeOut !important;
+    animation-name: layer-smoothFadeOut !important;
     -webkit-animation-duration: 0.25s !important;
     animation-duration: 0.25s !important;
 }
@@ -890,6 +892,15 @@ body {
 @keyframes layer-smoothFadeIn {
     0% { opacity: 0; transform: scale(0.96); }
     100% { opacity: 1; transform: scale(1); }
+}
+/* fade-out 关键帧 */
+@-webkit-keyframes layer-smoothFadeOut {
+    0% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0.96); }
+}
+@keyframes layer-smoothFadeOut {
+    0% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0.96); }
 }
 .layui-layer {
     border-radius: 20px !important;
@@ -954,13 +965,12 @@ body {
 }
 .layui-layer-shade {
     background: rgba(0, 0, 0, 0.3) !important;
+    animation: shadeFadeIn 0.25s ease forwards;
     transition: opacity 0.25s ease !important;
-    opacity: 1;
 }
-/* shade 同步淡出，与弹窗关闭动画保持一致 */
-.layui-layer-shade.is-out-anim {
-    opacity: 0;
-    transition: opacity 0.25s ease !important;
+@keyframes shadeFadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
 }
 .info-title {
     color: #8a9db0;

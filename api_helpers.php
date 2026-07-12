@@ -2,6 +2,7 @@
 /**
  * CRMoment - 辅助函数
  */
+require_once __DIR__ . '/api_config.php';
 
 /**
  * 输出 JSON 响应并终止
@@ -62,13 +63,17 @@ function getCurrentUserId(): ?int {
 
 /**
  * 从请求中获取 Token
- * 优先从 GET/POST 参数获取，兼容 JSON body 中的 token 字段
+ * 优先从 GET/POST 参数获取，兼容 JSON body 中的 token 字段，也支持 X-Auth-Token header
  */
 function getTokenFromRequest(): ?string {
     // 从 GET 或 POST 参数获取
     $token = $_GET['token'] ?? $_POST['token'] ?? null;
     if ($token) {
         return $token;
+    }
+    // 从 X-Auth-Token header 获取
+    if (!empty($_SERVER['HTTP_X_AUTH_TOKEN'])) {
+        return $_SERVER['HTTP_X_AUTH_TOKEN'];
     }
     // 也支持 JSON body 中的 token 字段（POST/PUT 时 body.token 会被解析后以参数形式传入）
     $raw = file_get_contents('php://input');

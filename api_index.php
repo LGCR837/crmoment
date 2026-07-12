@@ -96,6 +96,8 @@ try {
         handleNotificationsUnread();
     } elseif ($path === '/notifications/read' && $method === 'PUT') {
         handleNotificationsRead();
+    } elseif ($path === '/notifications/read' && $method === 'POST') {
+        handleNotificationsReadOne();
 
     // ---- Conversations ----
     } elseif ($path === '/conversations' && $method === 'GET') {
@@ -132,6 +134,24 @@ try {
         handleMusicUpdate((int)$m[1]);
     } elseif (preg_match('#^/music/(\d+)$#', $path, $m) && $method === 'DELETE') {
         handleMusicDelete((int)$m[1]);
+
+    // ---- User Playlists ----
+    } elseif ($path === '/music/playlists' && $method === 'GET') {
+        handleUserPlaylistsList();
+    } elseif ($path === '/music/playlists' && $method === 'POST') {
+        handleUserPlaylistCreate();
+    } elseif (preg_match('#^/music/playlists/(\d+)$#', $path, $m) && $method === 'GET') {
+        handleUserPlaylistShow((int)$m[1]);
+    } elseif (preg_match('#^/music/playlists/(\d+)$#', $path, $m) && $method === 'PUT') {
+        handleUserPlaylistUpdate((int)$m[1]);
+    } elseif (preg_match('#^/music/playlists/(\d+)$#', $path, $m) && $method === 'DELETE') {
+        handleUserPlaylistDelete((int)$m[1]);
+    } elseif (preg_match('#^/music/playlists/(\d+)/tracks$#', $path, $m) && $method === 'POST') {
+        handleUserPlaylistAddTrack((int)$m[1]);
+    } elseif (preg_match('#^/music/playlists/(\d+)/tracks$#', $path, $m) && $method === 'DELETE') {
+        handleUserPlaylistRemoveTrack((int)$m[1]);
+    } elseif (preg_match('#^/music/playlists/(\d+)/tracks/sort$#', $path, $m) && $method === 'PUT') {
+        handleUserPlaylistSortTracks((int)$m[1]);
 
     } else {
         error('接口不存在', 404);
