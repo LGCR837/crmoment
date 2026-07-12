@@ -15,7 +15,7 @@ var userPlaylists = {
         }
         
         $.ajax({
-            url: '../api.php?route=/music/playlists',
+            url: 'https://crmoment.ccwu.cc/api.php?route=/music/playlists',
             method: 'GET',
             data: { token: token },
             dataType: 'json',
@@ -67,7 +67,7 @@ var userPlaylists = {
         var loading = layer.msg('加载中...', { icon: 16, shade: [0.25, '#000'], time: 5000 });
         
         $.ajax({
-            url: '../api.php?route=/music/playlists/' + playlist.id,
+            url: 'https://crmoment.ccwu.cc/api.php?route=/music/playlists/' + playlist.id,
             method: 'GET',
             data: { token: token },
             dataType: 'json',
@@ -126,7 +126,7 @@ var userPlaylists = {
         var loading = layer.msg('加载中...', { icon: 16, shade: [0.25, '#000'], time: 10000 });
         
         $.ajax({
-            url: '../api.php?route=/music/playlists',
+            url: 'https://crmoment.ccwu.cc/api.php?route=/music/playlists',
             method: 'GET',
             data: { token: token },
             dataType: 'json',
@@ -230,7 +230,7 @@ var userPlaylists = {
         var token = localStorage.getItem('crmoment-token');
         
         $.ajax({
-            url: '../api.php?route=/music/playlists',
+            url: 'https://crmoment.ccwu.cc/api.php?route=/music/playlists',
             method: 'POST',
             data: JSON.stringify({ name: name }),
             contentType: 'application/json',
@@ -256,7 +256,7 @@ var userPlaylists = {
         var token = localStorage.getItem('crmoment-token');
         
         $.ajax({
-            url: '../api.php?route=/music/playlists/' + playlistId + '/tracks',
+            url: 'https://crmoment.ccwu.cc/api.php?route=/music/playlists/' + playlistId + '/tracks',
             method: 'POST',
             data: JSON.stringify({
                 crmid: crmid,
@@ -287,7 +287,7 @@ var userPlaylists = {
         var token = localStorage.getItem('crmoment-token');
         
         $.ajax({
-            url: '../api.php?route=/music/playlists/' + playlistId + '/tracks&crmid=' + encodeURIComponent(crmid),
+            url: 'https://crmoment.ccwu.cc/api.php?route=/music/playlists/' + playlistId + '/tracks&crmid=' + encodeURIComponent(crmid),
             method: 'DELETE',
             dataType: 'json',
             headers: { 'X-Auth-Token': token },
@@ -309,7 +309,7 @@ var userPlaylists = {
         var token = localStorage.getItem('crmoment-token');
         
         $.ajax({
-            url: '../api.php?route=/music/playlists/' + playlistId + '/tracks/sort',
+            url: 'https://crmoment.ccwu.cc/api.php?route=/music/playlists/' + playlistId + '/tracks/sort',
             method: 'PUT',
             data: JSON.stringify({ orders: orders }),
             contentType: 'application/json',
@@ -335,7 +335,7 @@ var userPlaylists = {
         }
         
         $.ajax({
-            url: '../api.php?route=/music/playlists',
+            url: 'https://crmoment.ccwu.cc/api.php?route=/music/playlists',
             method: 'GET',
             data: { token: token },
             dataType: 'json',
