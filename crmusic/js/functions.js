@@ -643,15 +643,15 @@ function adaptTextForCover(imgUrl) {
             }
             r /= n; g /= n; b /= n;
             var lum = 0.299 * r + 0.587 * g + 0.114 * b;
-            if(lum > 128) {
-                root.style.setProperty('--text-primary', '#1a1a1a');
-                root.style.setProperty('--text-secondary', '#333333');
-                root.style.setProperty('--text-muted', '#555555');
+            if(lum > 110) {
+                root.style.setProperty('--text-primary', '#000000');
+                root.style.setProperty('--text-secondary', '#222222');
+                root.style.setProperty('--text-muted', '#000000');
                 root.style.setProperty('--accent', '#2196F3');
             } else {
-                root.style.setProperty('--text-primary', '#f0f0f0');
-                root.style.setProperty('--text-secondary', '#d0d0d0');
-                root.style.setProperty('--text-muted', '#a0a0a0');
+                root.style.setProperty('--text-primary', '#ffffff');
+                root.style.setProperty('--text-secondary', '#eeeeee');
+                root.style.setProperty('--text-muted', '#ffffff');
                 root.style.setProperty('--accent', '#64B5F6');
             }
         } catch(e) {

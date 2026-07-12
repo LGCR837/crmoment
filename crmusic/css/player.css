@@ -165,13 +165,13 @@ body {
 .logo {
     font-size: 18px;
     font-weight: 600;
-    color: var(--text-primary);
+    color: #4a6075;
     cursor: pointer;
     letter-spacing: 0.5px;
     white-space: nowrap;
 }
 .logo:hover {
-    color: var(--accent);
+    color: #4a9fc7;
 }
 
 /* 头部右侧 - 搜索框 */
@@ -203,26 +203,26 @@ body {
     box-shadow: 0 0 0 3px rgba(126, 200, 227, 0.2);
 }
 .search-icon {
-    color: var(--text-secondary);
+    color: #5a6f84;
     flex-shrink: 0;
 }
 .search-inline input {
     background: transparent;
     border: none;
     outline: none;
-    color: var(--text-primary);
+    color: #4a6075;
     font-size: 13px;
     width: 140px;
     min-width: 60px;
     font-family: inherit;
 }
 .search-inline input::placeholder {
-    color: var(--text-muted);
+    color: #8a9db0;
 }
 
 .source-select select {
     background: rgba(255, 255, 255, 0.6);
-    color: var(--text-secondary);
+    color: #5a6f84;
     border: 2px solid rgba(150, 170, 190, 0.3);
     border-radius: 10px;
     padding: 0 10px;
@@ -689,12 +689,12 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-secondary);
+    color: #5a6f84;
     transition: color 0.15s ease;
     background-image: none !important;
 }
 .player-btn:hover {
-    color: var(--text-primary);
+    color: #4a6075;
 }
 
 /* 控制按钮(上一首、播放、下一首)区域 */
@@ -817,7 +817,7 @@ body {
     font-size: 12px;
     width: 90px;
     text-align: center;
-    color: var(--text-muted);
+    color: #8a9db0;
     font-variant-numeric: tabular-nums;
 }
 .mkpgb-bar {
