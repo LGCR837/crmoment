@@ -12,17 +12,14 @@
  * 这个文件放在网站根目录，不需要任何 URL 重写规则。
  */
 
-// CORS 跨域支持：允许子域名 music.crmoment.ccwu.cc 访问 API
-$allowedOrigins = ['https://music.crmoment.ccwu.cc'];
-if (!empty($_SERVER['HTTP_ORIGIN']) && in_array($_SERVER['HTTP_ORIGIN'], $allowedOrigins, true)) {
-    header('Access-Control-Allow-Origin: ' . $_SERVER['HTTP_ORIGIN']);
-    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, X-Auth-Token');
-    // 预检请求直接返回 204
-    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-        http_response_code(204);
-        exit;
-    }
+// CORS 跨域支持：允许子域名访问 API（API 靠 token 鉴权，不依赖来源校验）
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, X-Auth-Token');
+// 预检请求直接返回 204
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204);
+    exit;
 }
 
 // 构建 $_GET['route']：优先取查询参数，再尝试 PATH_INFO
