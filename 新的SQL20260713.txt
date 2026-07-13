@@ -1,0 +1,5 @@
+-- CRMoment 2026-07-13
+-- 请在 phpMyAdmin 中执行以下语句
+
+USE `serad2nim77d3wq`;
+

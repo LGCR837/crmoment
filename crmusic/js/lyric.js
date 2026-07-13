@@ -1,99 +1,144 @@
 /**************************************************
- * MKOnlinePlayer v2.31
- * 歌词解析及滚动模块
- * 编写：mengkun(http://mkblog.cn)
- * 时间：2017-9-13
+ * CRMusic Neo - 歌词解析及滚动模块 (v2)
+ * 基于 crmusic.html 的流畅滚动体验重构
  *************************************************/
- 
-var lyricArea = $("#lyric");    // 歌词显示容器
 
-// 在歌词区显示提示语（如歌词加载中、无歌词等）
+var lyricArea = $("#lyric");
+var lyricContainer = $(".lyric");
+
+var lrcData = [];
+var lastLyricIndex = -1;
+var isManualScroll = false;
+var wasManualScroll = false;
+var scrollTimer = null;
+var scrollAnim = null;
+var programmaticUntil = 0;
+var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 900;
+var SCROLL_RESUME = isMobile ? 5000 : 3000;
+
 function lyricTip(str) {
-    lyricArea.html("<li class='lyric-tip'>"+str+"</li>");     // 显示内容
+    lyricArea.html("<li class='lyric-tip'>" + str + "</li>");
 }
 
-// 歌曲加载完后的回调函数
-// 参数：歌词源文件
 function lyricCallback(str, id) {
-    if(id !== musicList[rem.playlist].item[rem.playid].id) return;  // 返回的歌词不是当前这首歌的，跳过
-    
-    rem.lyric = parseLyric(str);    // 解析获取到的歌词
-    
-    if(rem.lyric === '') {
+    if (id !== musicList[rem.playlist].item[rem.playid].id) return;
+
+    rem.lyric = parseLyric(str);
+
+    if (rem.lyric === '') {
         lyricTip('没有歌词');
         return false;
     }
-    
-    lyricArea.html('');     // 清空歌词区域的内容
-    lyricArea.scrollTop(0);    // 滚动到顶部
-    
-    rem.lastLyric = -1;
-    
-    // 显示全部歌词
-    var i = 0;
-    for(var k in rem.lyric){
-        var txt = rem.lyric[k];
-        if(!txt) txt = "&nbsp;";
-        var li = $("<li data-no='"+i+"' class='lrc-item'>"+txt+"</li>");
-        lyricArea.append(li);
-        i++;
+
+    lrcData = [];
+    for (var k in rem.lyric) {
+        lrcData.push({ time: parseInt(k), text: rem.lyric[k] });
     }
+    lrcData.sort(function(a, b) { return a.time - b.time; });
+
+    lyricArea.html('');
+    lyricArea.scrollTop(0);
+
+    lastLyricIndex = -1;
+    isManualScroll = false;
+    wasManualScroll = false;
+
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < lrcData.length; i++) {
+        var li = document.createElement("li");
+        li.className = "lrc-item";
+        li.dataset.no = i;
+        li.dataset.time = lrcData[i].time;
+        li.textContent = lrcData[i].text || "\u00A0";
+        frag.appendChild(li);
+    }
+    lyricArea[0].appendChild(frag);
 }
 
-// 强制刷新当前时间点的歌词
-// 参数：当前播放时间（单位：秒）
 function refreshLyric(time) {
-    if(rem.lyric === '') return false;
-    
-    time = parseInt(time);  // 时间取整
-    var i = 0;
-    for(var k in rem.lyric){
-        if(k >= time) break;
-        i = k;      // 记录上一句的
-    }
-    
-    scrollLyric(i);
+    if (lrcData.length === 0) return false;
+    var index = findLyricIndex(time);
+    scrollToIndex(index, false);
 }
 
-// 滚动歌词到指定句
-// 参数：当前播放时间（单位：秒）
+function findLyricIndex(time) {
+    if (lrcData.length === 0) return 0;
+    var adjusted = time + 0.1;
+    if (adjusted < lrcData[0].time) return 0;
+    if (adjusted > lrcData[lrcData.length - 1].time) return lrcData.length - 1;
+    for (var i = 0; i < lrcData.length; i++) {
+        if (adjusted < lrcData[i].time) return i - 1;
+    }
+    return 0;
+}
+
+function smoothScrollTo(targetTop, duration) {
+    if (scrollAnim) cancelAnimationFrame(scrollAnim);
+    var container = lyricArea[0];
+    var startTop = container.scrollTop;
+    var dist = targetTop - startTop;
+    if (Math.abs(dist) < 1) { container.scrollTop = targetTop; return; }
+    var startTime = null;
+    programmaticUntil = Date.now() + duration + 50;
+    function step(ts) {
+        if (!startTime) startTime = ts;
+        var progress = Math.min((ts - startTime) / duration, 1);
+        var ease = 1 - Math.pow(1 - progress, 3);
+        container.scrollTop = startTop + dist * ease;
+        if (progress < 1) scrollAnim = requestAnimationFrame(step);
+        else scrollAnim = null;
+    }
+    scrollAnim = requestAnimationFrame(step);
+}
+
+function scrollToIndex(index, animated) {
+    if (index < 0 || index >= lrcData.length) return;
+
+    var items = lyricArea.children('.lrc-item');
+    if (items.length === 0) return;
+
+    var prev = lyricArea.children('.lplaying');
+    prev.removeClass('lplaying');
+
+    var active = items.eq(index);
+    if (!active.hasClass('lplaying')) {
+        active.addClass('lplaying');
+    }
+
+    if (lastLyricIndex === index) return;
+    lastLyricIndex = index;
+
+    if (!isManualScroll) {
+        var containerHeight = lyricContainer.height();
+        var liTop = active[0].offsetTop;
+        var liHeight = active[0].offsetHeight;
+        var target = liTop + liHeight / 2 - containerHeight / 2;
+
+        if (animated !== false) {
+            smoothScrollTo(target, 600);
+        } else {
+            lyricArea[0].scrollTop = target;
+        }
+    }
+}
+
 function scrollLyric(time) {
-    if(rem.lyric === '') return false;
-    
-    time = parseInt(time);  // 时间取整
-    
-    if(rem.lyric === undefined || rem.lyric[time] === undefined) return false;  // 当前时间点没有歌词
-    
-    if(rem.lastLyric == time) return true;  // 歌词没发生改变
-    
-    var i = 0;  // 获取当前歌词是在第几行
-    for(var k in rem.lyric){
-        if(k == time) break;
-        i ++;
-    }
-    rem.lastLyric = time;  // 记录方便下次使用
-    $(".lplaying").removeClass("lplaying");     // 移除其余句子的正在播放样式
-    $(".lrc-item[data-no='" + i + "']").addClass("lplaying");    // 加上正在播放样式
-    
-    var scroll = (lyricArea.children().height() * i) - ($(".lyric").height() / 2); 
-    lyricArea.stop().animate({scrollTop: scroll}, 1000);  // 平滑滚动到当前歌词位置(更改这个数值可以改变歌词滚动速度，单位：毫秒)
-    
+    if (lrcData.length === 0) return false;
+    var index = findLyricIndex(time);
+    scrollToIndex(index);
 }
 
-// 解析歌词
-// 这一函数来自 https://github.com/TivonJJ/html5-music-player
-// 参数：原始歌词文件
 function parseLyric(lrc) {
-    if(lrc === '') return '';
+    if (lrc === '') return '';
     var lyrics = lrc.split("\n");
     var lrcObj = {};
-    for(var i=0;i<lyrics.length;i++){
+    for (var i = 0; i < lyrics.length; i++) {
         var lyric = decodeURIComponent(lyrics[i]);
         var timeReg = /\[\d*:\d*((\.|\:)\d*)*\]/g;
         var timeRegExpArr = lyric.match(timeReg);
-        if(!timeRegExpArr)continue;
-        var clause = lyric.replace(timeReg,'');
-        for(var k = 0,h = timeRegExpArr.length;k < h;k++) {
+        if (!timeRegExpArr) continue;
+        var clause = lyric.replace(timeReg, '');
+        for (var k = 0, h = timeRegExpArr.length; k < h; k++) {
             var t = timeRegExpArr[k];
             var min = Number(String(t.match(/\[\d*/i)).slice(1)),
                 sec = Number(String(t.match(/\:\d*/i)).slice(1));
@@ -102,4 +147,37 @@ function parseLyric(lrc) {
         }
     }
     return lrcObj;
+}
+
+function enterManualMode() {
+    isManualScroll = true;
+    wasManualScroll = false;
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(function() {
+        isManualScroll = false;
+        wasManualScroll = true;
+        var time = rem.audio && rem.audio[0] ? rem.audio[0].currentTime : 0;
+        var index = findLyricIndex(time);
+        scrollToIndex(index);
+    }, SCROLL_RESUME);
+}
+
+lyricArea.on('click', '.lrc-item', function(e) {
+    var li = $(this);
+    var time = parseFloat(li.data('time'));
+    if (isNaN(time)) return;
+    if (rem.audio && rem.audio[0]) {
+        rem.audio[0].currentTime = time;
+    }
+    isManualScroll = false;
+    wasManualScroll = false;
+    clearTimeout(scrollTimer);
+    var index = findLyricIndex(time);
+    scrollToIndex(index);
+});
+
+if (!isMobile) {
+    lyricArea.on('wheel', function() { enterManualMode(); });
+} else {
+    lyricArea.on('touchmove', function() { enterManualMode(); });
 }

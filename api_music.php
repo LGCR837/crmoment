@@ -239,24 +239,26 @@ function handleMusicDelete(int $id): void {
  * 获取当前用户的歌单列表
  */
 function handleUserPlaylistsList(): void {
-    $userId = requireLogin();
+    $userId = getCurrentUserId();
     $pdo = getDB();
 
     $stmt = $pdo->prepare(
-        'SELECT p.id, p.name, p.cover, p.created_at, p.updated_at,
+        'SELECT p.id, p.name, p.cover, p.user_id, u.nickname AS creator_name, p.created_at, p.updated_at,
                 COUNT(pt.id) AS track_count
          FROM user_playlists p
          LEFT JOIN playlist_tracks pt ON pt.playlist_id = p.id
-         WHERE p.user_id = ?
+         LEFT JOIN users u ON u.id = p.user_id
          GROUP BY p.id
          ORDER BY p.created_at DESC'
     );
-    $stmt->execute([$userId]);
+    $stmt->execute();
     $list = $stmt->fetchAll();
 
     foreach ($list as &$item) {
         $item['id'] = (int)$item['id'];
+        $item['user_id'] = (int)$item['user_id'];
         $item['track_count'] = (int)$item['track_count'];
+        $item['is_owner'] = ($item['user_id'] === $userId);
     }
     unset($item);
 
@@ -295,21 +297,35 @@ function handleUserPlaylistCreate(): void {
  * 获取歌单详情及歌曲列表
  */
 function handleUserPlaylistShow(int $id): void {
-    $userId = requireLogin();
+    $userId = getCurrentUserId();
     $pdo = getDB();
 
-    $stmt = $pdo->prepare('SELECT id, name, cover, created_at, updated_at FROM user_playlists WHERE id = ? AND user_id = ?');
-    $stmt->execute([$id, $userId]);
+    $stmt = $pdo->prepare('SELECT id, name, cover, user_id, created_at, updated_at FROM user_playlists WHERE id = ?');
+    $stmt->execute([$id]);
     $playlist = $stmt->fetch();
     if (!$playlist) {
         error('歌单不存在', 404);
     }
+    $playlist['is_owner'] = ((int)$playlist['user_id'] === $userId);
 
+    // 分页参数
+    $page = max(1, (int)($_GET['page'] ?? 1));
+    $perPage = max(1, min(100, (int)($_GET['per_page'] ?? 50)));
+    $offset = ($page - 1) * $perPage;
+
+    // 总歌曲数
+    $stmt = $pdo->prepare('SELECT COUNT(*) FROM playlist_tracks WHERE playlist_id = ?');
+    $stmt->execute([$id]);
+    $total = (int)$stmt->fetchColumn();
+
+    // 分页取歌曲
     $stmt = $pdo->prepare(
         'SELECT id, crmid, source, track_id, name, artist, album, sort_order, added_at
-         FROM playlist_tracks WHERE playlist_id = ? ORDER BY sort_order ASC, added_at ASC'
+         FROM playlist_tracks WHERE playlist_id = ?
+         ORDER BY sort_order ASC, added_at ASC
+         LIMIT ? OFFSET ?'
     );
-    $stmt->execute([$id]);
+    $stmt->execute([$id, $perPage, $offset]);
     $tracks = $stmt->fetchAll();
 
     foreach ($tracks as &$t) {
@@ -320,6 +336,10 @@ function handleUserPlaylistShow(int $id): void {
 
     $playlist['id'] = (int)$playlist['id'];
     $playlist['tracks'] = $tracks;
+    $playlist['total'] = $total;
+    $playlist['page'] = $page;
+    $playlist['per_page'] = $perPage;
+    $playlist['has_more'] = ($offset + $perPage) < $total;
 
     success($playlist);
 }

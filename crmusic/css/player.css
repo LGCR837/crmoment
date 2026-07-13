@@ -621,24 +621,41 @@ body {
     color: var(--text-secondary);
     line-height: 30px;
     padding: 10px 0 5px 0;
+    mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
 }
 #lyric {
     position: absolute;
     width: 100%;
     top: 0;
     bottom: 0;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 40% 0;
+    scroll-behavior: auto;
 }
+#lyric::-webkit-scrollbar { width: 0; height: 0; }
 #lyric>li {
     word-break: keep-all;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    transition: color 0.3s ease;
+    transition: color 0.4s ease, transform 0.4s ease, text-shadow 0.4s ease, opacity 0.4s ease;
+    cursor: pointer;
+    padding: 8px 16px;
+    opacity: 0.5;
+    transform: scale(0.95);
+}
+#lyric>li:hover {
+    opacity: 0.8;
 }
 #lyric .lplaying {
     color: var(--accent);
-    font-weight: 500;
+    font-weight: 600;
+    font-size: 1.2em;
+    opacity: 1;
+    transform: scale(1);
+    text-shadow: 0 0 12px rgba(74, 159, 199, 0.3), 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 .lyric-tip {
     position: absolute;

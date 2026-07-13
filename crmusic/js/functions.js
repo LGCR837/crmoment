@@ -172,8 +172,8 @@ $(function(){
 
     // 列表项单击播放（整行点击）
     $(".music-list").on("click",".list-item", function(e) {
-        // 忽略菜单按钮区域的点击（下载、分享）
-        if($(e.target).closest('.icon-download,.icon-share,.list-mobile-menu').length) return false;
+        // 忽略菜单按钮区域的点击（下载、分享、添加到歌单、删除等）
+        if($(e.target).closest('.list-icon,.list-menu,.list-mobile-menu').length) return false;
         var num = parseInt($(this).data("no"));
         if(isNaN(num)) return false;
         listClick(num);
@@ -199,9 +199,6 @@ $(function(){
             target.html() +
             '</span>' +
             '<div class="list-menu" data-no="' + num + '">' +
-                '<span class="list-icon icon-download" title="下载">' +
-                    '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
-                '</span>' +
                 addPlaylistBtn +
                 deleteBtn +
                 '<span class="list-icon icon-share" data-function="share" title="分享">' +
@@ -214,7 +211,7 @@ $(function(){
     });
     
     // 列表中的菜单点击
-    $(".music-list").on("click",".icon-download,.icon-share,.icon-add-playlist,.icon-remove-track", function() {
+    $(".music-list").on("click",".icon-share,.icon-add-playlist,.icon-remove-track", function() {
         var num = parseInt($(this).parent().data("no"));
         if(isNaN(num)) return false;
         switch($(this).data("function")) {
@@ -261,6 +258,18 @@ $(function(){
         $(".list-loadmore").removeClass('list-loadmore');
         $(".list-loadmore").html('加载中...');
         ajaxSearch();
+    });
+
+    // 点击歌单加载更多
+    $(".music-list").on("click",".list-playlist-more", function() {
+        var list = rem.dislist;
+        var $btn = $(this);
+        $btn.removeClass('list-playlist-more').html('加载中...');
+        if (typeof userPlaylists !== 'undefined' && musicList[list] && musicList[list]._nextPage) {
+            userPlaylists.loadTracks(list, function(idx) {
+                loadList(idx);
+            }, musicList[list]._nextPage);
+        }
     });
     
     // 点击专辑显示专辑歌曲
@@ -401,9 +410,15 @@ function musicInfo(list, index) {
         tempStr += '<br><span class="info-title">时长：</span>' + formatTime(rem.audio[0].duration);
     }
     
-    tempStr += '<br><span class="info-title">操作：</span>' + 
-    '<span class="info-btn" onclick="thisDownload(this)" data-list="' + list + '" data-index="' + index + '">下载</span>' + 
-    '<span style="margin-left: 10px" class="info-btn" onclick="thisDownloadLrc(this)" data-list="' + list + '" data-index="' + index + '">下载歌词</span>' + 
+    tempStr += '<br><span class="info-title">下载：</span>' +
+    '<span class="info-btn" onclick="thisDownloadQuality(\'' + list + '\',\'' + index + '\',\'default\')">默认品质</span>' +
+    ' <span class="info-btn" onclick="thisDownloadQuality(\'' + list + '\',\'' + index + '\',128)">低品质</span>' +
+    ' <span class="info-btn" onclick="thisDownloadQuality(\'' + list + '\',\'' + index + '\',192)">中品质</span>' +
+    ' <span class="info-btn" onclick="thisDownloadQuality(\'' + list + '\',\'' + index + '\',320)">高品质</span>' +
+    ' <span class="info-btn" onclick="thisDownloadQuality(\'' + list + '\',\'' + index + '\',740)">超高品质</span>' +
+    ' <span class="info-btn" onclick="thisDownloadQuality(\'' + list + '\',\'' + index + '\',999)">无损品质</span>' +
+    '<br><span class="info-title">其他：</span>' + 
+    '<span class="info-btn" onclick="thisDownloadLrc(this)" data-list="' + list + '" data-index="' + index + '">下载歌词</span>' + 
     '<span style="margin-left: 10px" class="info-btn" onclick="thisDownloadPic(this)" data-list="' + list + '" data-index="' + index + '">下载封面</span>' + 
     '<span style="margin-left: 10px" class="info-btn" onclick="thisShare(this)" data-list="' + list + '" data-index="' + index + '">外链</span>';
     
@@ -438,6 +453,47 @@ function searchSubmit() {
 // 下载
 function thisDownload(obj) {
     ajaxUrl(musicList[$(obj).data("list")].item[$(obj).data("index")], download);
+}
+
+// 按品质下载歌曲
+function thisDownloadQuality(list, index, br) {
+    var music = musicList[list].item[index];
+    layer.closeAll();
+    
+    if (br === 'default') {
+        // 默认品质：获取原始链接在新标签页打开
+        var loading = layer.msg('获取下载链接...', { icon: 16, shade: [0.25, '#000'], time: 10000 });
+        ajaxUrl(music, function(m) {
+            layer.close(loading);
+            if (m.url && m.url !== 'err' && m.url !== '') {
+                window.open(m.url, '_blank');
+            } else {
+                layer.msg('获取下载链接失败');
+            }
+        });
+    } else {
+        // 指定品质：从第三方接口获取
+        var loading = layer.msg('获取 ' + br + 'kbps 下载链接...', { icon: 16, shade: [0.25, '#000'], time: 15000 });
+        $.ajax({
+            url: 'https://music-api.gdstudio.xyz/api.php',
+            method: 'GET',
+            data: { types: 'url', source: music.source, id: music.id, br: br },
+            dataType: 'json',
+            timeout: 15000,
+            success: function(data) {
+                layer.close(loading);
+                if (data && data.url) {
+                    window.open(data.url, '_blank');
+                } else {
+                    layer.msg('获取 ' + br + 'kbps 下载链接失败');
+                }
+            },
+            error: function() {
+                layer.close(loading);
+                layer.msg('获取 ' + br + 'kbps 下载链接失败，请检查网络');
+            }
+        });
+    }
 }
 
 // 下载封面
@@ -717,6 +773,11 @@ function loadList(list) {
             if(list == 1 || list == 2) tmpMusic.url = "";
         }
 
+        // 用户歌单有更多歌曲 → 显示"加载更多"按钮
+        if (musicList[list].userPlaylist && musicList[list]._hasMore) {
+            addListbar("playlist-more");
+        }
+
         if(list == 1) {
             addListbar("clear");
         }
@@ -769,6 +830,9 @@ function addListbar(types) {
     switch(types) {
         case "more":
             html = '<div class="list-item text-center list-loadmore list-clickable" title="点击加载更多数据" id="list-foot">点击加载更多...</div>';
+        break;
+        case "playlist-more":
+            html = '<div class="list-item text-center list-playlist-more list-clickable" id="list-foot">加载更多歌曲...</div>';
         break;
         case "nomore":
             html = '<div class="list-item text-center" id="list-foot">全都加载完了</div>';

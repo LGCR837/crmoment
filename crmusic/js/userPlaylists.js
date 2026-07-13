@@ -56,20 +56,23 @@ var userPlaylists = {
         });
     },
     
-    // 加载歌单中的歌曲
-    loadTracks: function(playlistIndex, callback) {
+    // 加载歌单中的歌曲（支持分页）
+    loadTracks: function(playlistIndex, callback, page) {
         var playlist = musicList[playlistIndex];
         if (!playlist || !playlist.userPlaylist) return;
         
         var token = localStorage.getItem('crmoment-token');
         if (!token) return;
         
+        page = page || 1;
+        var isFirstPage = (page === 1);
+        
         var loading = layer.msg('加载中...', { icon: 16, shade: [0.25, '#000'], time: 5000 });
         
         $.ajax({
             url: 'https://crmoment.ccwu.cc/api.php?route=/music/playlists/' + playlist.id,
             method: 'GET',
-            data: { token: token },
+            data: { token: token, page: page, per_page: 50 },
             dataType: 'json',
             success: function(res) {
                 layer.close(loading);
@@ -78,7 +81,10 @@ var userPlaylists = {
                     return;
                 }
                 
-                playlist.item = [];
+                if (isFirstPage) {
+                    playlist.item = [];
+                }
+                
                 var tracks = res.data.tracks || [];
                 for (var i = 0; i < tracks.length; i++) {
                     var t = tracks[i];
@@ -89,14 +95,17 @@ var userPlaylists = {
                         album: t.album || '未知',
                         source: t.source,
                         url_id: t.track_id,
-                        pic_id: null,
+                        pic_id: t.track_id,
                         lyric_id: t.track_id,
                         pic: null,
                         url: null,
                         crmid: t.crmid
                     });
                 }
-                playlist.trackCount = tracks.length;
+                playlist.trackCount = playlist.item.length;
+                playlist._total = res.data.total;
+                playlist._hasMore = res.data.has_more;
+                playlist._nextPage = page + 1;
                 
                 // 更新 sheet 显示
                 $(".sheet-item[data-no='" + playlistIndex + "'] .sheet-name").text(playlist.name);
@@ -244,8 +253,12 @@ var userPlaylists = {
                 }
                 if (callback) callback(res.data.id);
             },
-            error: function() {
-                layer.msg('创建失败');
+            error: function(jqXHR) {
+                var msg = '创建失败';
+                if (jqXHR.responseJSON && jqXHR.responseJSON.message) {
+                    msg = jqXHR.responseJSON.message;
+                }
+                layer.msg(msg);
                 if (callback) callback(null);
             }
         });
@@ -276,8 +289,12 @@ var userPlaylists = {
                 }
                 if (callback) callback();
             },
-            error: function() {
-                layer.msg('添加失败');
+            error: function(jqXHR) {
+                var msg = '添加失败';
+                if (jqXHR.responseJSON && jqXHR.responseJSON.message) {
+                    msg = jqXHR.responseJSON.message;
+                }
+                layer.msg(msg);
             }
         });
     },
