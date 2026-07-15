@@ -122,6 +122,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
+// ---------- 处理置顶/取消置顶 ----------
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && in_array($_POST['action'], ['pin_post', 'unpin_post'], true)) {
+    if (empty($_SESSION['admin_logged_in'])) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => '未登录']);
+        exit;
+    }
+    $postId = (int)($_POST['post_id'] ?? 0);
+    if ($postId <= 0) {
+        echo json_encode(['ok' => false, 'error' => '参数错误']);
+        exit;
+    }
+
+    try {
+        $pdo  = getDB();
+        $isPinned = ($_POST['action'] === 'pin_post') ? 1 : 0;
+        $stmt = $pdo->prepare('UPDATE posts SET is_pinned = ? WHERE id = ?');
+        $stmt->execute([$isPinned, $postId]);
+
+        if ($stmt->rowCount() === 0) {
+            echo json_encode(['ok' => false, 'error' => '动态不存在']);
+            exit;
+        }
+
+        $message = $isPinned ? '已置顶' : '已取消置顶';
+        echo json_encode(['ok' => true, 'message' => $message]);
+        exit;
+    } catch (PDOException $e) {
+        echo json_encode(['ok' => false, 'error' => '数据库错误']);
+        exit;
+    }
+}
+
 // ---------- 判断是否已登录 ----------
 $loggedIn = !empty($_SESSION['admin_logged_in']);
 
@@ -187,11 +220,11 @@ if ($loggedIn) {
         $totalPosts = (int)$stmt->fetch()['cnt'];
 
         $stmt = $pdo->prepare(
-            'SELECT p.id, p.content, p.images, p.videos, p.likes_count, p.comments_count, p.created_at,
+            'SELECT p.id, p.content, p.images, p.videos, p.likes_count, p.comments_count, p.is_pinned, p.created_at,
                     u.id AS user_id, u.username, u.nickname
              FROM posts p
              JOIN users u ON p.user_id = u.id
-             ORDER BY p.created_at DESC
+             ORDER BY p.is_pinned DESC, p.created_at DESC
              LIMIT ? OFFSET ?'
         );
         $stmt->execute([$size, $offset]);
@@ -202,6 +235,7 @@ if ($loggedIn) {
             $p['user_id']       = (int)$p['user_id'];
             $p['likes_count']   = (int)$p['likes_count'];
             $p['comments_count'] = (int)$p['comments_count'];
+            $p['is_pinned']     = (bool)$p['is_pinned'];
             $p['images']        = $p['images'] ? json_decode($p['images'], true) : [];
             $p['videos']        = $p['videos'] ? json_decode($p['videos'], true) : [];
             // 计算视频文件总大小
@@ -301,6 +335,10 @@ tbody tr:last-child td { border-bottom: none; }
 .btn { display: inline-block; padding: 6px 14px; border-radius: 5px; font-size: 12px; border: none; cursor: pointer; transition: background .15s; }
 .btn-danger { background: #d93025; color: #fff; }
 .btn-danger:hover { background: #b3261e; }
+.btn-primary { background: #1a73e8; color: #fff; }
+.btn-primary:hover { background: #1557b0; }
+.btn-warning { background: #e8710a; color: #fff; }
+.btn-warning:hover { background: #c86200; }
 .btn-small { padding: 4px 10px; font-size: 11px; }
 
 /* 分页 */
@@ -469,13 +507,14 @@ tbody tr:last-child td { border-bottom: none; }
                     <th>媒体</th>
                     <th class="col-small">👍 点赞</th>
                     <th class="col-small">💬 评论</th>
+                    <th class="col-small">置顶</th>
                     <th class="col-small">时间</th>
                     <th>操作</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($posts)): ?>
-                    <tr><td colspan="8" class="empty-state">暂无动态</td></tr>
+                    <tr><td colspan="9" class="empty-state">暂无动态</td></tr>
                 <?php else: ?>
                     <?php foreach ($posts as $p): ?>
                     <?php
@@ -490,9 +529,12 @@ tbody tr:last-child td { border-bottom: none; }
                         if ($imgCount > 0) $mediaParts[] = "{$imgCount}张图";
                         if ($vidCount > 0) $mediaParts[] = "🎬 {$vidSizeStr}";
                         $mediaStr = $mediaParts ? implode(' / ', $mediaParts) : '-';
+                        $idDisplay = $p['is_pinned'] ? '#TOP' . $p['id'] : '#' . $p['id'];
+                        $pinBtnText = $p['is_pinned'] ? '取消置顶' : '置顶';
+                        $pinBtnAction = $p['is_pinned'] ? 'unpin_post' : 'pin_post';
                     ?>
                     <tr>
-                        <td class="col-id">#<?= $p['id'] ?></td>
+                        <td class="col-id"><?= $idDisplay ?></td>
                         <td class="col-small">
                             <span class="avatar-placeholder" style="width:24px;height:24px;line-height:24px;font-size:11px;"><?= htmlspecialchars(mb_substr($p['nickname'] ?: $p['username'], 0, 1)) ?></span>
                             <?= htmlspecialchars($p['nickname'] ?: $p['username']) ?>
@@ -501,8 +543,10 @@ tbody tr:last-child td { border-bottom: none; }
                         <td class="col-small text-muted"><?= $mediaStr ?></td>
                         <td class="col-small"><?= $p['likes_count'] ?></td>
                         <td class="col-small"><?= $p['comments_count'] ?></td>
+                        <td class="col-small"><?= $p['is_pinned'] ? '📌' : '-' ?></td>
                         <td class="col-small text-muted"><span class="time-utc" data-utc="<?= htmlspecialchars($p['created_at']) ?>"><?= $p['created_at'] ?></span></td>
-                        <td>
+                        <td style="display:flex;gap:4px;flex-wrap:wrap;">
+                            <button class="btn btn-small <?= $p['is_pinned'] ? 'btn-warning' : 'btn-primary' ?>" onclick="togglePin(<?= $p['id'] ?>, '<?= $pinBtnAction ?>', this)"><?= $pinBtnText ?></button>
                             <button class="btn btn-danger btn-small" onclick="deletePost(<?= $p['id'] ?>, this)">撤回</button>
                         </td>
                     </tr>
@@ -512,7 +556,7 @@ tbody tr:last-child td { border-bottom: none; }
             <?php if ($totalPosts > $size): ?>
             <tfoot>
                 <tr>
-                    <td colspan="8">
+                    <td colspan="9">
                         <div class="pagination">
                             <?php if ($page > 1): ?>
                                 <a href="?page=<?= $page - 1 ?>&size=<?= $size ?>">← 上一页</a>
@@ -569,6 +613,40 @@ function deletePost(postId, btn) {
         btn.textContent = '撤回';
     };
     xhr.send('action=delete_post&post_id=' + postId);
+}
+
+function togglePin(postId, action, btn) {
+    btn.disabled = true;
+    var originalText = btn.textContent;
+    btn.textContent = '处理中...';
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '', true);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    xhr.onload = function() {
+        try {
+            var res = JSON.parse(xhr.responseText);
+            if (res.ok) {
+                showToast(res.message, 'success');
+                // 刷新页面以反映排序变化
+                location.reload();
+            } else {
+                showToast('操作失败：' + (res.error || '未知错误'), 'error');
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        } catch(e) {
+            showToast('服务器响应异常', 'error');
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    };
+    xhr.onerror = function() {
+        showToast('网络错误', 'error');
+        btn.disabled = false;
+        btn.textContent = originalText;
+    };
+    xhr.send('action=' + action + '&post_id=' + postId);
 }
 
 function showToast(msg, type) {

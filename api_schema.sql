@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS `posts` (
     `videos` JSON DEFAULT NULL COMMENT '视频路径数组 ["/uploads/videos/...", ...]',
     `likes_count` INT UNSIGNED DEFAULT 0,
     `comments_count` INT UNSIGNED DEFAULT 0,
+    `is_pinned` TINYINT(1) DEFAULT 0 COMMENT '是否置顶',
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     INDEX `idx_user_id` (`user_id`),
     INDEX `idx_created_at` (`created_at`),

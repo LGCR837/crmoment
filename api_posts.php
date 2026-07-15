@@ -21,11 +21,11 @@ function handlePostsList(): void {
 
     // 获取列表（含作者信息）
     $stmt = $pdo->prepare(
-        'SELECT p.id, p.content, p.images, p.videos, p.likes_count, p.comments_count, p.created_at,
+        'SELECT p.id, p.content, p.images, p.videos, p.likes_count, p.comments_count, p.is_pinned, p.created_at,
                 u.id AS user_id, u.username, u.nickname, u.avatar
          FROM posts p
          JOIN users u ON p.user_id = u.id
-         ORDER BY p.created_at DESC
+         ORDER BY p.is_pinned DESC, p.created_at DESC
          LIMIT ? OFFSET ?'
     );
     $stmt->execute([$size, $offset]);
@@ -37,6 +37,7 @@ function handlePostsList(): void {
         $post['user_id']       = (int)$post['user_id'];
         $post['likes_count']   = (int)$post['likes_count'];
         $post['comments_count'] = (int)$post['comments_count'];
+        $post['is_pinned']     = (bool)$post['is_pinned'];
         $post['images']        = $post['images'] ? json_decode($post['images'], true) : [];
         $post['videos']        = $post['videos'] ? json_decode($post['videos'], true) : [];
     }
@@ -74,7 +75,7 @@ function handlePostsShow(int $id): void {
 
     $pdo  = getDB();
     $stmt = $pdo->prepare(
-        'SELECT p.id, p.content, p.images, p.videos, p.likes_count, p.comments_count, p.created_at,
+        'SELECT p.id, p.content, p.images, p.videos, p.likes_count, p.comments_count, p.is_pinned, p.created_at,
                 u.id AS user_id, u.username, u.nickname, u.avatar
          FROM posts p
          JOIN users u ON p.user_id = u.id
@@ -91,6 +92,7 @@ function handlePostsShow(int $id): void {
     $post['user_id']       = (int)$post['user_id'];
     $post['likes_count']   = (int)$post['likes_count'];
     $post['comments_count'] = (int)$post['comments_count'];
+    $post['is_pinned']     = (bool)$post['is_pinned'];
     $post['images']        = $post['images'] ? json_decode($post['images'], true) : [];
     $post['videos']        = $post['videos'] ? json_decode($post['videos'], true) : [];
 

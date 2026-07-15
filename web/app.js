@@ -525,6 +525,7 @@ function renderPostCard(post) {
     const imageHtml = renderImages(images);
     const likedClass = post.is_liked ? 'liked' : '';
     const postUrl = `/web#${post.id}`;
+    const badgeText = post.is_pinned ? `#TOP${post.id}` : `#${post.id}`;
 
     let canRecall = false;
     if (state.user) {
@@ -545,7 +546,7 @@ function renderPostCard(post) {
             <img src="${avatarSrc(post.avatar)}" class="post-avatar" data-user-id="${post.user_id}"
                  onerror="${avatarOnerror(post.nickname || post.username)}">
             <span class="post-author" data-user-id="${post.user_id}">${escapeHtml(post.nickname || post.username)}</span>
-            <span class="post-badge">#${post.id}</span>
+            <span class="post-badge">${badgeText}</span>
             <span class="post-time">${time}</span>
         </div>
         <div class="post-content">${renderTextWithLinks(post.content)}</div>
