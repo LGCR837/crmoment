@@ -149,7 +149,7 @@ function handleCommentsDelete(int $id): void {
     $userId = requireLogin();
 
     $pdo  = getDB();
-    $stmt = $pdo->prepare('SELECT id, post_id, user_id FROM comments WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT id, post_id, user_id, created_at FROM comments WHERE id = ?');
     $stmt->execute([$id]);
     $comment = $stmt->fetch();
 
@@ -158,6 +158,14 @@ function handleCommentsDelete(int $id): void {
     }
     if ((int)$comment['user_id'] !== $userId) {
         error('无权删除此评论', 403);
+    }
+
+    // 72 小时撤回时限
+    $stmt = $pdo->prepare("SELECT TIMESTAMPDIFF(SECOND, ?, NOW()) AS seconds_ago");
+    $stmt->execute([$comment['created_at']]);
+    $row = $stmt->fetch();
+    if (!$row || (int)$row['seconds_ago'] > 259200) {
+        error('已超过 72 小时，无法撤回', 403);
     }
 
     // 删除评论及其子回复

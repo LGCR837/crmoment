@@ -623,6 +623,18 @@ async function openComments(postId) {
     }
 }
 
+function canRecallComment(createdAt, userId) {
+    if (!state.user) return false;
+    if (String(userId) !== String(state.user.id)) return false;
+    const d = new Date(createdAt.replace(' ', 'T') + 'Z');
+    return (Date.now() - d.getTime()) < 72 * 60 * 60 * 1000;
+}
+
+function recallCommentHtml(commentId, createdAt, userId) {
+    if (!canRecallComment(createdAt, userId)) return '';
+    return `<span class="comment-recall-btn" data-comment-id="${commentId}">撤回</span>`;
+}
+
 function renderComments(comments) {
     if (!comments || comments.length === 0) {
         dom.commentList.innerHTML = '<div class="comment-empty">暂无评论，来写第一条吧</div>';
@@ -635,7 +647,10 @@ function renderComments(comments) {
             <div class="comment-body">
                 <div class="comment-author" data-user-id="${c.user_id}">${escapeHtml(c.nickname || c.username)}</div>
                 <div class="comment-text">${renderTextWithLinks(c.content)}</div>
-                <div class="comment-time">${formatTime(c.created_at)}</div>
+                <div class="comment-time">
+                    ${formatTime(c.created_at)}
+                    ${recallCommentHtml(c.id, c.created_at, c.user_id)}
+                </div>
                 ${c.replies && c.replies.length > 0 ? c.replies.map(r => `
                     <div class="comment-item" style="margin-top:8px;padding-left:42px;border:none">
                         <img src="${avatarSrc(r.avatar)}" class="comment-avatar" data-user-id="${r.user_id}"
@@ -643,7 +658,10 @@ function renderComments(comments) {
                         <div class="comment-body" style="margin-left:0">
                             <div class="comment-author" data-user-id="${r.user_id}">${escapeHtml(r.nickname || r.username)}</div>
                             <div class="comment-text">${renderTextWithLinks(r.content)}</div>
-                            <div class="comment-time">${formatTime(r.created_at)}</div>
+                            <div class="comment-time">
+                                ${formatTime(r.created_at)}
+                                ${recallCommentHtml(r.id, r.created_at, r.user_id)}
+                            </div>
                         </div>
                     </div>
                 `).join('') : ''}
@@ -656,6 +674,32 @@ function renderComments(comments) {
             e.stopPropagation();
             const userId = el.dataset.userId;
             if (userId) { dialogClose(dom.commentOverlay); navigateToUserProfile(parseInt(userId)); }
+        });
+    });
+
+    // 评论撤回事件
+    dom.commentList.querySelectorAll('.comment-recall-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const commentId = btn.dataset.commentId;
+            if (!confirm('确定撤回这条评论？')) return;
+            try {
+                await api('DELETE', `/comments/${commentId}`);
+                showToast('已撤回');
+                const data = await api('GET', `/posts/${state.commentPostId}/comments`);
+                renderComments(data.list);
+                const post = state.posts.find(p => p.id == state.commentPostId);
+                if (post) {
+                    post.comments_count = (post.comments_count || 0) - 1;
+                    const card = document.querySelector(`.post-card[data-post-id="${state.commentPostId}"]`);
+                    if (card) {
+                        const countSpan = card.querySelector('.comment-btn .comment-count');
+                        if (countSpan) countSpan.textContent = Math.max(0, post.comments_count);
+                    }
+                }
+            } catch (e) {
+                showToast(e.message);
+            }
         });
     });
 }

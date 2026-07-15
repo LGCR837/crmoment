@@ -257,8 +257,8 @@ function handlePostsDelete(int $id): void {
     $stmt = $pdo->prepare("SELECT TIMESTAMPDIFF(SECOND, created_at, NOW()) AS seconds_ago FROM posts WHERE id = ?");
     $stmt->execute([$id]);
     $row = $stmt->fetch();
-    if (!$row || (int)$row['seconds_ago'] > 86400) {
-        error('已超过 24 小时，无法撤回', 403);
+    if (!$row || (int)$row['seconds_ago'] > 259200) {
+        error('已超过 72 小时，无法撤回', 403);
     }
 
     // 删除关联图片文件
