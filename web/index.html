@@ -7,6 +7,21 @@
     <link rel="icon" href="logo192.png">
     <link rel="stylesheet" href="material-symbols.css">
     <link rel="stylesheet" href="style.css">
+
+    <!-- Blocking script: apply theme BEFORE body renders, preventing flash -->
+    <script>
+        (function() {
+            var THEME_KEY = 'crmoment-theme';
+            var saved = localStorage.getItem(THEME_KEY);
+            var theme;
+            if (saved) {
+                theme = saved;
+            } else {
+                theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
 </head>
 <body>
     <!-- Top Navigation Bar -->
@@ -137,6 +152,10 @@
             <div class="modal-headline" id="comment-title">评论</div>
             <div class="modal-content">
                 <div id="comment-list" class="comment-list"></div>
+                <div id="comment-reply-bar" class="comment-reply-bar" style="display:none">
+                    <span class="reply-indicator">回复 <span id="comment-reply-username"></span></span>
+                    <button class="btn-text" id="comment-reply-cancel">取消</button>
+                </div>
                 <textarea id="comment-input" class="comment-input" rows="2" placeholder="写评论..."></textarea>
             </div>
             <div class="modal-actions">

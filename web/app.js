@@ -15,6 +15,7 @@ const state = {
     musicSearchQuery: '',
     editingMusicId: null,
     commentPostId: null,
+    replyTo: null, // { commentId, username }
     selectedImages: [],
     selectedVideos: [],
     conversations: [],
@@ -206,6 +207,20 @@ function retryArea(msg, retryFn) {
     return `<div class="retry-area">${escapeHtml(msg)}<br><button class="btn-primary retry-btn" id="${id}">${icon('refresh')} 重试</button></div>`;
 }
 
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('已复制链接');
+    }).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('已复制链接');
+    });
+}
+
 // ===== Auth =====
 let authMode = 'login';
 
@@ -376,6 +391,10 @@ async function navigateTo(page) {
     }
 }
 
+function navigateToPost(postId) {
+    openPostDetail(postId);
+}
+
 // ===== Home Page =====
 async function renderHome() {
     state.page = 1;
@@ -447,28 +466,26 @@ async function loadPosts() {
 
 function bindPostCardEvents(card) {
     card.querySelectorAll('.like-btn').forEach(btn => {
-        btn.addEventListener('click', () => handleLike(btn.dataset.postId));
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleLike(btn.dataset.postId);
+        });
     });
     card.querySelectorAll('.comment-btn').forEach(btn => {
-        btn.addEventListener('click', () => openComments(btn.dataset.postId));
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openComments(btn.dataset.postId);
+        });
     });
     card.querySelectorAll('.share-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            navigator.clipboard.writeText(btn.dataset.url).then(() => {
-                showToast('已复制链接');
-            }).catch(() => {
-                const ta = document.createElement('textarea');
-                ta.value = btn.dataset.url;
-                document.body.appendChild(ta);
-                ta.select();
-                document.execCommand('copy');
-                document.body.removeChild(ta);
-                showToast('已复制链接');
-            });
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            copyToClipboard(btn.dataset.url);
         });
     });
     card.querySelectorAll('.recall-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
             if (!confirm('确定撤回这条动态？')) return;
             try {
                 await api('DELETE', `/posts/${btn.dataset.postId}`);
@@ -488,6 +505,12 @@ function bindPostCardEvents(card) {
             const userId = el.dataset.userId;
             if (userId) navigateToUserProfile(parseInt(userId));
         });
+    });
+    // Click on card body (not on action buttons) opens detail page
+    card.addEventListener('click', (e) => {
+        const target = e.target.closest('.action-btn, .post-author, .post-avatar, .post-images img, .video-link');
+        if (target) return;
+        openPostDetail(card.dataset.postId);
     });
 }
 
@@ -524,7 +547,7 @@ function renderPostCard(post) {
     const videoHtml = renderVideos(videos);
     const imageHtml = renderImages(images);
     const likedClass = post.is_liked ? 'liked' : '';
-    const postUrl = `/web#${post.id}`;
+    const postUrl = `${window.location.origin}/web#post:${post.id}`;
     const badgeText = post.is_pinned ? `#TOP${post.id}` : `#${post.id}`;
 
     let canRecall = false;
@@ -609,8 +632,17 @@ async function handleLike(postId) {
 }
 
 // ===== Comments =====
+function clearReply() {
+    state.replyTo = null;
+    const modalBar = $('#comment-reply-bar');
+    if (modalBar) modalBar.style.display = 'none';
+    const detailBar = $('#detail-reply-bar');
+    if (detailBar) detailBar.style.display = 'none';
+}
+
 async function openComments(postId) {
     state.commentPostId = postId;
+    clearReply();
     dom.commentTitle.textContent = '评论';
     dom.commentList.innerHTML = '<div class="loading-indicator"><div class="spinner"></div></div>';
     dom.commentInput.value = '';
@@ -640,36 +672,62 @@ function renderComments(comments) {
         dom.commentList.innerHTML = '<div class="comment-empty">暂无评论，来写第一条吧</div>';
         return;
     }
-    dom.commentList.innerHTML = comments.map(c => `
+
+    // 展平：将回复作为独立评论，内容前加 @父评论作者
+    const flat = [];
+    comments.forEach(c => {
+        flat.push(c);
+        if (c.replies && c.replies.length > 0) {
+            const parentName = escapeHtml(c.nickname || c.username);
+            c.replies.forEach(r => {
+                flat.push({
+                    ...r,
+                    _replyTo: parentName,
+                    _replyToUserId: c.user_id,
+                });
+            });
+        }
+    });
+
+    dom.commentList.innerHTML = flat.map(c => `
         <div class="comment-item">
             <img src="${avatarSrc(c.avatar)}" class="comment-avatar" data-user-id="${c.user_id}"
                  onerror="${avatarOnerror(c.nickname || c.username)}">
             <div class="comment-body">
                 <div class="comment-author" data-user-id="${c.user_id}">${escapeHtml(c.nickname || c.username)}</div>
-                <div class="comment-text">${renderTextWithLinks(c.content)}</div>
+                <div class="comment-text">${c._replyTo ? `<span class="reply-at" data-user-id="${c._replyToUserId}">@${c._replyTo}</span> ` : ''}${renderTextWithLinks(c.content)}</div>
                 <div class="comment-time">
                     ${formatTime(c.created_at)}
+                    <button class="comment-reply-btn" data-comment-id="${c.id}" data-username="${escapeHtml(c.nickname || c.username)}">回复</button>
                     ${recallCommentHtml(c.id, c.created_at, c.user_id)}
                 </div>
-                ${c.replies && c.replies.length > 0 ? c.replies.map(r => `
-                    <div class="comment-item" style="margin-top:8px;padding-left:42px;border:none">
-                        <img src="${avatarSrc(r.avatar)}" class="comment-avatar" data-user-id="${r.user_id}"
-                             onerror="${avatarOnerror(r.nickname || r.username)}">
-                        <div class="comment-body" style="margin-left:0">
-                            <div class="comment-author" data-user-id="${r.user_id}">${escapeHtml(r.nickname || r.username)}</div>
-                            <div class="comment-text">${renderTextWithLinks(r.content)}</div>
-                            <div class="comment-time">
-                                ${formatTime(r.created_at)}
-                                ${recallCommentHtml(r.id, r.created_at, r.user_id)}
-                            </div>
-                        </div>
-                    </div>
-                `).join('') : ''}
             </div>
         </div>
     `).join('\n');
 
     dom.commentList.querySelectorAll('.comment-avatar, .comment-author').forEach(el => {
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const userId = el.dataset.userId;
+            if (userId) { dialogClose(dom.commentOverlay); navigateToUserProfile(parseInt(userId)); }
+        });
+    });
+
+    // 评论回复按钮
+    dom.commentList.querySelectorAll('.comment-reply-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const commentId = parseInt(btn.dataset.commentId);
+            const username = btn.dataset.username;
+            state.replyTo = { commentId, username };
+            $('#comment-reply-username').textContent = username;
+            $('#comment-reply-bar').style.display = 'flex';
+            dom.commentInput.focus();
+        });
+    });
+
+    // 回复@点击跳转
+    dom.commentList.querySelectorAll('.reply-at').forEach(el => {
         el.addEventListener('click', (e) => {
             e.stopPropagation();
             const userId = el.dataset.userId;
@@ -704,13 +762,276 @@ function renderComments(comments) {
     });
 }
 
+// ===== Post Detail Page =====
+async function openPostDetail(postId) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    state.currentPage = 'post';
+    window.location.hash = 'post:' + postId;
+    $$('.nav-btn').forEach(b => b.classList.remove('active'));
+
+    dom.main.innerHTML = '<div class="loading-indicator"><div class="spinner"></div></div>';
+    try {
+        const post = await api('GET', `/posts/${postId}`);
+        const time = formatTime(post.created_at);
+        const username = post.nickname || post.username || '匿名';
+        const images = post.images || [];
+        const videos = post.videos || [];
+        const videoHtml = renderVideos(videos);
+        const imageHtml = renderImages(images);
+        const likedClass = post.is_liked ? 'liked' : '';
+
+        let canRecall = false;
+        if (state.user) {
+            const isOwner = String(post.user_id) === String(state.user.id);
+            if (isOwner) {
+                const postTime = new Date(post.created_at?.replace(' ', 'T') + 'Z').getTime();
+                canRecall = (Date.now() - postTime) < 24 * 60 * 60 * 1000;
+            }
+        }
+        const recallHtml = canRecall ? `
+            <button class="action-btn recall-btn" data-post-id="${post.id}">
+                ${icon('undo')}<span>撤回</span>
+            </button>` : '';
+        const detailPostUrl = `${window.location.origin}/web#post:${post.id}`;
+
+        dom.main.innerHTML = `
+            <div class="post-detail-card">
+                <div class="post-detail-header">
+                    <button class="btn-icon" id="btn-back-detail">${icon('arrow_back')}</button>
+                    <img src="${avatarSrc(post.avatar)}" class="post-avatar" data-user-id="${post.user_id}"
+                         onerror="${avatarOnerror(username)}">
+                    <span class="post-author" data-user-id="${post.user_id}">${escapeHtml(username)}</span>
+                    <span class="post-badge">#${post.id}</span>
+                    <span class="post-time">${time}</span>
+                </div>
+                <div class="post-detail-content">${renderTextWithLinks(post.content)}</div>
+                ${videoHtml}
+                ${imageHtml}
+                <div class="post-detail-actions">
+                    <button class="action-btn like-btn ${likedClass}" data-post-id="${post.id}">
+                        ${icon(post.is_liked ? 'favorite' : 'favorite_border')}
+                        <span>${post.likes_count || 0}</span>
+                    </button>
+                    <button class="action-btn comment-btn" data-post-id="${post.id}">
+                        ${icon('chat_bubble_outline')}
+                        <span>${post.comments_count || 0}</span>
+                    </button>
+                    <button class="action-btn share-btn" data-url="${detailPostUrl}">
+                        ${icon('share')}<span>分享</span>
+                    </button>
+                    ${recallHtml}
+                </div>
+            </div>
+            <div class="detail-comments-section">
+                <div class="section-title">评论</div>
+                <div id="detail-comment-list" class="detail-comment-list"></div>
+                <div class="detail-reply-bar" id="detail-reply-bar" style="display:none">
+                    <span class="reply-indicator">回复 <span id="detail-reply-username"></span></span>
+                    <button class="btn-text" id="detail-reply-cancel">取消</button>
+                </div>
+                <div class="detail-comment-input-bar">
+                    <textarea id="detail-comment-input" placeholder="写评论..." rows="1"></textarea>
+                    <button class="btn-primary" id="detail-comment-send">${icon('send')}</button>
+                </div>
+            </div>
+        `;
+
+        // Back button
+        $('#btn-back-detail')?.addEventListener('click', () => navigateTo('home'));
+
+        // Author click
+        dom.main.querySelectorAll('.post-author, .post-avatar').forEach(el => {
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const userId = el.dataset.userId;
+                if (userId) navigateToUserProfile(parseInt(userId));
+            });
+        });
+
+        // Like button
+        const likeBtn = dom.main.querySelector('.like-btn');
+        likeBtn?.addEventListener('click', async () => {
+            if (!state.user) { showToast('请先登录'); return; }
+            try {
+                if (post.is_liked) {
+                    await api('DELETE', `/posts/${postId}/like`);
+                    post.is_liked = false;
+                    post.likes_count = Math.max(0, post.likes_count - 1);
+                } else {
+                    await api('POST', `/posts/${postId}/like`);
+                    post.is_liked = true;
+                    post.likes_count = (post.likes_count || 0) + 1;
+                }
+                likeBtn.classList.toggle('liked', post.is_liked);
+                likeBtn.querySelector('.material-symbols-outlined').textContent = post.is_liked ? 'favorite' : 'favorite_border';
+                likeBtn.querySelector('span:last-child').textContent = post.likes_count;
+            } catch (e) { showToast(e.message); }
+        });
+
+        // Recall button
+        dom.main.querySelector('.recall-btn')?.addEventListener('click', async () => {
+            if (!confirm('确定撤回这条动态？')) return;
+            try {
+                await api('DELETE', `/posts/${postId}`);
+                showToast('已撤回');
+                navigateTo('home');
+            } catch (e) { showToast(e.message); }
+        });
+
+        // Share button
+        dom.main.querySelector('.share-btn')?.addEventListener('click', (e) => {
+            copyToClipboard(e.currentTarget.dataset.url);
+        });
+
+        // Detail reply cancel
+        $('#detail-reply-cancel')?.addEventListener('click', clearReply);
+
+        // Comment send
+        const commentSend = $('#detail-comment-send');
+        const commentInput = $('#detail-comment-input');
+        commentSend?.addEventListener('click', async () => {
+            if (!state.user) { showToast('请先登录'); return; }
+            const content = commentInput.value.trim();
+            if (!content) { showToast('请输入评论内容'); return; }
+            try {
+                const body = { content };
+                if (state.replyTo) body.parent_id = state.replyTo.commentId;
+                await api('POST', `/posts/${postId}/comments`, body);
+                commentInput.value = '';
+                clearReply();
+                showToast('评论成功');
+                loadDetailComments(postId);
+                // Update comment count in the detail page
+                post.comments_count = (post.comments_count || 0) + 1;
+                const countSpan = dom.main.querySelector('.comment-btn span:last-child');
+                if (countSpan) countSpan.textContent = post.comments_count;
+            } catch (e) { showToast(e.message); }
+        });
+        commentInput?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commentSend?.click(); }
+        });
+
+        // Bind images
+        dom.main.querySelectorAll('.post-images img').forEach(img => bindImageEvents(img));
+
+        loadDetailComments(postId);
+    } catch (e) {
+        dom.main.innerHTML = `
+            <div class="retry-area">
+                加载失败: ${escapeHtml(e.message)}<br>
+                <button class="btn-primary retry-btn" id="btn-back-detail-error">${icon('arrow_back')} 返回</button>
+            </div>`;
+        $('#btn-back-detail-error')?.addEventListener('click', () => navigateTo('home'));
+    }
+}
+
+async function loadDetailComments(postId) {
+    const container = $('#detail-comment-list');
+    if (!container) return;
+    container.innerHTML = '<div class="loading-indicator"><div class="spinner"></div></div>';
+    try {
+        const data = await api('GET', `/posts/${postId}/comments`);
+        const comments = data.list || [];
+        if (comments.length === 0) {
+            container.innerHTML = '<div class="detail-comment-empty">暂无评论，来写第一条吧</div>';
+            return;
+        }
+
+        // 展平：将回复作为独立评论，内容前加 @父评论作者
+        const flat = [];
+        comments.forEach(c => {
+            flat.push(c);
+            if (c.replies && c.replies.length > 0) {
+                const parentName = escapeHtml(c.nickname || c.username);
+                c.replies.forEach(r => {
+                    flat.push({
+                        ...r,
+                        _replyTo: parentName,
+                        _replyToUserId: c.user_id,
+                    });
+                });
+            }
+        });
+
+        container.innerHTML = flat.map(c => `
+            <div class="detail-comment-item">
+                <img src="${avatarSrc(c.avatar)}" class="detail-comment-avatar" data-user-id="${c.user_id}"
+                     onerror="${avatarOnerror(c.nickname || c.username)}">
+                <div class="detail-comment-body">
+                    <div class="detail-comment-author" data-user-id="${c.user_id}">${escapeHtml(c.nickname || c.username)}</div>
+                    <div class="detail-comment-text">${c._replyTo ? `<span class="reply-at" data-user-id="${c._replyToUserId}">@${c._replyTo}</span> ` : ''}${renderTextWithLinks(c.content)}</div>
+                    <div class="detail-comment-time">
+                        ${formatTime(c.created_at)}
+                        <button class="comment-reply-btn" data-comment-id="${c.id}" data-username="${escapeHtml(c.nickname || c.username)}">回复</button>
+                        ${recallCommentHtml(c.id, c.created_at, c.user_id)}
+                    </div>
+                </div>
+            </div>
+        `).join('\n');
+
+        // Bind author clicks
+        container.querySelectorAll('.detail-comment-avatar, .detail-comment-author').forEach(el => {
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const userId = el.dataset.userId;
+                if (userId) navigateToUserProfile(parseInt(userId));
+            });
+        });
+
+        // Bind reply buttons
+        container.querySelectorAll('.comment-reply-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const commentId = parseInt(btn.dataset.commentId);
+                const username = btn.dataset.username;
+                state.replyTo = { commentId, username };
+                const replyBar = $('#detail-reply-bar');
+                if (replyBar) {
+                    $('#detail-reply-username').textContent = username;
+                    replyBar.style.display = 'flex';
+                }
+                const input = $('#detail-comment-input');
+                if (input) input.focus();
+            });
+        });
+
+        // Bind reply-at clicks
+        container.querySelectorAll('.reply-at').forEach(el => {
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const userId = el.dataset.userId;
+                if (userId) navigateToUserProfile(parseInt(userId));
+            });
+        });
+
+        // Bind recall buttons
+        container.querySelectorAll('.comment-recall-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const commentId = btn.dataset.commentId;
+                if (!confirm('确定撤回这条评论？')) return;
+                try {
+                    await api('DELETE', `/comments/${commentId}`);
+                    showToast('已撤回');
+                    loadDetailComments(postId);
+                } catch (e) { showToast(e.message); }
+            });
+        });
+    } catch (e) {
+        container.innerHTML = `<div class="retry-area">加载评论失败: ${escapeHtml(e.message)}</div>`;
+    }
+}
+
 dom.commentSubmit.addEventListener('click', async () => {
     if (!state.user) { showToast('请先登录'); return; }
     const content = dom.commentInput.value.trim();
     if (!content) { showToast('请输入评论内容'); return; }
     try {
-        await api('POST', `/posts/${state.commentPostId}/comments`, { content });
+        const body = { content };
+        if (state.replyTo) body.parent_id = state.replyTo.commentId;
+        await api('POST', `/posts/${state.commentPostId}/comments`, body);
         dom.commentInput.value = '';
+        clearReply();
         showToast('评论成功');
         const data = await api('GET', `/posts/${state.commentPostId}/comments`);
         renderComments(data.list);
@@ -726,7 +1047,11 @@ dom.commentSubmit.addEventListener('click', async () => {
     } catch (e) { showToast(e.message); }
 });
 
-dom.commentCancel.addEventListener('click', () => dialogClose(dom.commentOverlay));
+dom.commentCancel.addEventListener('click', () => { clearReply(); dialogClose(dom.commentOverlay); });
+
+// 回复取消按钮
+$('#comment-reply-cancel')?.addEventListener('click', clearReply);
+$('#detail-reply-cancel')?.addEventListener('click', clearReply);
 
 // ===== Post Composer =====
 let selectedFiles = [];
@@ -1921,7 +2246,10 @@ async function init() {
     await renderHome();
     const hash = window.location.hash.slice(1);
     if (hash && /^\d+$/.test(hash)) await scrollToPost(hash);
-    else if (hash.startsWith('page:')) {
+    else if (hash.startsWith('post:')) {
+        const postId = parseInt(hash.slice(5));
+        if (postId) openPostDetail(postId);
+    } else if (hash.startsWith('page:')) {
         const page = hash.slice(5);
         if (page.startsWith('user:')) {
             const uid = parseInt(page.slice(5));

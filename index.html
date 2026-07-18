@@ -107,6 +107,58 @@
             }
         }
     </style>
+
+    <style>
+        /* ===== Dark Mode (sync with web/ app) ===== */
+        html[data-theme="dark"] body {
+            background: linear-gradient(180deg, #1a1e24 0%, #1e222a 25%, #222730 50%, #1e222a 75%, #1a1e24 100%);
+            color: #d4dce8;
+        }
+
+        html[data-theme="dark"] h1 {
+            background: linear-gradient(135deg, #7A5C2D, #c9a06a);
+            background-clip: text;
+            -webkit-background-clip: text;
+        }
+
+        html[data-theme="dark"] .subtitle {
+            color: #b0c0d0;
+        }
+
+        html[data-theme="dark"] .btn {
+            background: linear-gradient(135deg, #7A5C2D, #6a4c1d);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        html[data-theme="dark"] .btn:hover {
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+        }
+
+        html[data-theme="dark"] .footer {
+            color: #5a6a7a;
+        }
+
+        /* Smooth transition for theme changes */
+        html[data-theme="dark"] body,
+        body {
+            transition: background 0.4s ease, color 0.4s ease;
+        }
+    </style>
+
+    <!-- Blocking script: apply theme BEFORE body renders, preventing flash -->
+    <script>
+        (function() {
+            var THEME_KEY = 'crmoment-theme';
+            var saved = localStorage.getItem(THEME_KEY);
+            var theme;
+            if (saved) {
+                theme = saved;
+            } else {
+                theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
 </head>
 <body>
     <div class="landing">
@@ -115,5 +167,28 @@
         <a href="/web/" class="btn">CRMoment Web</a>
         <p class="footer">CRMoment · Powered by LGCR837</p>
     </div>
+
+    <script>
+        // Switch logo based on current theme, and listen for system changes
+        (function() {
+            var THEME_KEY = 'crmoment-theme';
+            function switchLogo() {
+                var t = document.documentElement.getAttribute('data-theme') || 'light';
+                var logo = document.querySelector('.logo-img');
+                if (logo) {
+                    logo.src = t === 'dark' ? '/web/crmomentlogodark.png' : '/web/crmomentlogo.png';
+                }
+            }
+            switchLogo();
+            // Listen for system theme changes when no saved preference
+            if (!localStorage.getItem(THEME_KEY)) {
+                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+                    var t = e.matches ? 'dark' : 'light';
+                    document.documentElement.setAttribute('data-theme', t);
+                    switchLogo();
+                });
+            }
+        })();
+    </script>
 </body>
 </html>
