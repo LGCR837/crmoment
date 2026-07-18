@@ -4,7 +4,7 @@
  */
 
 /**
- * GET /posts?page=1&size=20
+ * GET /posts?page=1&size=20&user_id=1
  */
 function handlePostsList(): void {
     assertMethod('GET');
@@ -12,23 +12,36 @@ function handlePostsList(): void {
     $page = max(1, (int)getParam('page', 1));
     $size = max(1, min(50, (int)getParam('size', PAGE_SIZE)));
     $offset = ($page - 1) * $size;
+    $userId = (int)getParam('user_id', 0);
 
     $pdo = getDB();
 
-    // 获取总数
-    $stmt = $pdo->query('SELECT COUNT(*) AS cnt FROM posts');
+    // 获取总数（支持按用户过滤）
+    if ($userId > 0) {
+        $stmt = $pdo->prepare('SELECT COUNT(*) AS cnt FROM posts WHERE user_id = ?');
+        $stmt->execute([$userId]);
+    } else {
+        $stmt = $pdo->query('SELECT COUNT(*) AS cnt FROM posts');
+    }
     $total = (int)$stmt->fetch()['cnt'];
 
-    // 获取列表（含作者信息）
-    $stmt = $pdo->prepare(
-        'SELECT p.id, p.content, p.images, p.videos, p.likes_count, p.comments_count, p.is_pinned, p.created_at,
+    // 获取列表（含作者信息，支持按用户过滤）
+    $sql = 'SELECT p.id, p.content, p.images, p.videos, p.likes_count, p.comments_count, p.is_pinned, p.created_at,
                 u.id AS user_id, u.username, u.nickname, u.avatar
          FROM posts p
-         JOIN users u ON p.user_id = u.id
-         ORDER BY p.is_pinned DESC, p.created_at DESC
-         LIMIT ? OFFSET ?'
-    );
-    $stmt->execute([$size, $offset]);
+         JOIN users u ON p.user_id = u.id';
+    $params = [];
+    if ($userId > 0) {
+        $sql .= ' WHERE p.user_id = ?';
+        $params[] = $userId;
+    }
+    $sql .= ' ORDER BY p.is_pinned DESC, p.created_at DESC
+         LIMIT ? OFFSET ?';
+    $params[] = $size;
+    $params[] = $offset;
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $posts = $stmt->fetchAll();
 
     // 格式化

@@ -221,6 +221,13 @@ function copyToClipboard(text) {
     });
 }
 
+// Apply fade-slide-up animation to container's children after loading
+function fadeInContainer(container) {
+    requestAnimationFrame(() => {
+        container.querySelectorAll(':scope > *').forEach(el => el.classList.add('fade-slide-in'));
+    });
+}
+
 // ===== Auth =====
 let authMode = 'login';
 
@@ -412,6 +419,7 @@ async function renderHome() {
         <div id="post-feed"></div>
         <div id="feed-status"></div>
     `;
+    fadeInContainer(dom.main);
 
     $('#composer-trigger')?.addEventListener('click', () => dialogOpen(dom.composerOverlay));
     await loadPosts();
@@ -451,14 +459,17 @@ async function loadPosts() {
 
         if (state.hasMore) {
             status.innerHTML = '<div class="loading-indicator" id="load-more-btn"><button class="btn-text">加载更多</button></div>';
+            fadeInContainer(status);
             $('#load-more-btn')?.addEventListener('click', () => { state.page++; loadPosts(); });
         } else {
             status.innerHTML = state.posts.length > 0
                 ? '<div class="end-indicator">— 没有更多了 —</div>'
                 : '<div class="end-indicator">暂无动态，快来发布第一条吧！</div>';
+            fadeInContainer(status);
         }
     } catch (e) {
         status.innerHTML = retryArea('加载失败: ' + e.message, () => { state.page = 1; state.posts = []; state.hasMore = true; loadPosts(); });
+        fadeInContainer(status);
     } finally {
         state.loading = false;
     }
@@ -835,6 +846,7 @@ async function openPostDetail(postId) {
                 </div>
             </div>
         `;
+        fadeInContainer(dom.main);
 
         // Back button
         $('#btn-back-detail')?.addEventListener('click', () => navigateTo('home'));
@@ -921,6 +933,7 @@ async function openPostDetail(postId) {
                 加载失败: ${escapeHtml(e.message)}<br>
                 <button class="btn-primary retry-btn" id="btn-back-detail-error">${icon('arrow_back')} 返回</button>
             </div>`;
+        fadeInContainer(dom.main);
         $('#btn-back-detail-error')?.addEventListener('click', () => navigateTo('home'));
     }
 }
@@ -1490,17 +1503,53 @@ async function renderProfile() {
     }
 
     try {
-        const data = await api('GET', `/posts?page=1&size=20`);
-        const myPosts = data.list.filter(p => p.user_id === state.user.id);
-        $('#profile-post-count').textContent = myPosts.length;
+        const data = await api('GET', `/posts?page=1&size=10&user_id=${state.user.id}`);
+        const myPosts = data.list;
+        state.profilePosts = myPosts;
+        state.profileHasMore = data.has_more;
+        state.profilePage = 1;
+        $('#profile-post-count').textContent = data.total;
+        const container = $('#my-posts');
         if (myPosts.length === 0) {
-            $('#my-posts').innerHTML = '<div class="end-indicator">还没有发布过动态</div>';
+            container.innerHTML = '<div class="end-indicator">还没有发布过动态</div>';
         } else {
-            state.posts = myPosts;
-            $('#my-posts').innerHTML = myPosts.map(p => renderPostCard(p)).join('\n');
+            container.innerHTML = myPosts.map(p => renderPostCard(p)).join('\n');
             setupPostCardEvents('#my-posts');
+            if (state.profileHasMore) {
+                container.insertAdjacentHTML('afterend', '<div class="loading-indicator" id="profile-load-more"><button class="btn-text">加载更多</button></div>');
+                $('#profile-load-more')?.addEventListener('click', loadMoreProfilePosts);
+            }
         }
     } catch (e) { $('#my-posts').innerHTML = retryArea('加载失败: ' + e.message, renderProfile); }
+}
+
+async function loadMoreProfilePosts() {
+    const btn = $('#profile-load-more');
+    if (!btn) return;
+    state.profilePage++;
+    try {
+        const data = await api('GET', `/posts?page=${state.profilePage}&size=10&user_id=${state.user.id}`);
+        const newPosts = data.list;
+        state.profilePosts = [...state.profilePosts, ...newPosts];
+        state.profileHasMore = data.has_more;
+        const container = $('#my-posts');
+        if (container) {
+            container.insertAdjacentHTML('beforeend', newPosts.map(p => renderPostCard(p)).join('\n'));
+            container.querySelectorAll('.post-card:not([data-bound])').forEach(card => {
+                card.dataset.bound = '1';
+                bindPostCardEvents(card);
+            });
+            observeRevealElements();
+        }
+        if (state.profileHasMore) {
+            btn.innerHTML = '<button class="btn-text">加载更多</button>';
+            btn.querySelector('button')?.addEventListener('click', loadMoreProfilePosts);
+        } else {
+            btn.outerHTML = '<div class="end-indicator">— 没有更多了 —</div>';
+        }
+    } catch (e) {
+        btn.innerHTML = retryArea('加载失败: ' + e.message, loadMoreProfilePosts);
+    }
 }
 
 function setupPostCardEvents(container) {
@@ -1533,7 +1582,7 @@ async function renderUserProfile(userId) {
     try {
         const [user, postsData] = await Promise.all([
             api('GET', `/user/${userId}`),
-            api('GET', `/posts?page=1&size=20`),
+            api('GET', `/posts?page=1&size=10&user_id=${userId}`),
         ]);
         const isSelf = state.user && state.user.id === userId;
         dom.main.innerHTML = `
@@ -1555,6 +1604,7 @@ async function renderUserProfile(userId) {
             </div>
             <div class="section-title">${escapeHtml(user.nickname || user.username)} 的动态</div>
             <div id="user-posts"></div>`;
+        fadeInContainer(dom.main);
 
         $('#btn-back-from-user')?.addEventListener('click', () => {
             navigateTo('home');
@@ -1569,14 +1619,46 @@ async function renderUserProfile(userId) {
             } catch (e) { showToast(e.message); }
         });
 
-        const userPosts = postsData.list.filter(p => p.user_id === userId);
+        const userPosts = postsData.list;
         const container = $('#user-posts');
+        let userPostsPage = 1;
+        let userPostsHasMore = postsData.has_more;
         if (userPosts.length === 0) {
             container.innerHTML = '<div class="end-indicator">还没有发布过动态</div>';
         } else {
-            state.posts = userPosts;
             container.innerHTML = userPosts.map(p => renderPostCard(p)).join('\n');
             setupPostCardEvents('#user-posts');
+            if (userPostsHasMore) {
+                container.insertAdjacentHTML('afterend', '<div class="loading-indicator" id="user-load-more"><button class="btn-text">加载更多</button></div>');
+                $('#user-load-more')?.addEventListener('click', loadMoreUserPosts);
+            }
+        }
+
+        async function loadMoreUserPosts() {
+            const btn = $('#user-load-more');
+            if (!btn) return;
+            userPostsPage++;
+            try {
+                const data = await api('GET', `/posts?page=${userPostsPage}&size=10&user_id=${userId}`);
+                const newPosts = data.list;
+                userPostsHasMore = data.has_more;
+                if (container) {
+                    container.insertAdjacentHTML('beforeend', newPosts.map(p => renderPostCard(p)).join('\n'));
+                    container.querySelectorAll('.post-card:not([data-bound])').forEach(card => {
+                        card.dataset.bound = '1';
+                        bindPostCardEvents(card);
+                    });
+                    observeRevealElements();
+                }
+                if (userPostsHasMore) {
+                    btn.innerHTML = '<button class="btn-text">加载更多</button>';
+                    btn.querySelector('button')?.addEventListener('click', loadMoreUserPosts);
+                } else {
+                    btn.outerHTML = '<div class="end-indicator">— 没有更多了 —</div>';
+                }
+            } catch (e) {
+                btn.innerHTML = retryArea('加载失败: ' + e.message, loadMoreUserPosts);
+            }
         }
     } catch (e) {
         dom.main.innerHTML = `
@@ -1809,6 +1891,7 @@ async function renderConversationList() {
             <button class="btn-primary" id="btn-create-group" style="padding:6px 16px;font-size:13px">${icon('group_add')} 创建群聊</button>
         </div>
         <div id="conv-list"></div>`;
+    fadeInContainer(dom.main);
     $('#btn-create-group')?.addEventListener('click', openCreateGroupDialog);
     if (state.conversations.length === 0) { $('#conv-list').innerHTML = '<div class="end-indicator">暂无会话</div>'; return; }
     $('#conv-list').innerHTML = state.conversations.map(conv => renderConvItem(conv)).join('\n');

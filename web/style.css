@@ -127,7 +127,7 @@ a:hover { text-decoration: underline; }
     display: flex;
     justify-content: center;
     gap: 4px;
-    padding: 8px 16px;
+    padding: 16px 16px 0;
     background: transparent;
 }
 
@@ -1230,4 +1230,20 @@ textarea.field-input {
 
 [data-theme="dark"] .detail-comment-avatar {
     border-color: rgba(122, 92, 45, 0.25);
+}
+
+/* ===== Fade and slide up animation for loaded content ===== */
+@keyframes fadeSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-slide-in {
+    animation: fadeSlideUp 0.35s ease both;
 }
