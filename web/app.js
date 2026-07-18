@@ -1379,7 +1379,7 @@ async function loadNotifications() {
             function renderNotifItems(items) {
                 return items.map(n => {
                     const text = n.type === 'like' ? '赞了你的动态' : n.type === 'comment' ? '评论了你的动态' : '回复了你的评论';
-                    return `<div class="notif-item ${n.is_read ? '' : 'unread'}" data-post-id="${n.post_id || ''}">
+                    return `<div class="notif-item ${n.is_read ? '' : 'unread'}" data-notif-id="${n.id}" data-post-id="${n.post_id || ''}">
                         <div class="notif-text"><strong>${escapeHtml(n.actor_nickname || n.actor_username)}</strong> ${text}</div>
                         <div class="notif-time">${formatTime(n.created_at)}</div>
                     </div>`;
@@ -1393,7 +1393,22 @@ async function loadNotifications() {
             dom.notifList.querySelectorAll('.notif-item').forEach(el => {
                 el.addEventListener('click', async () => {
                     const postId = el.dataset.postId;
+                    const notifId = el.dataset.notifId;
                     if (!postId) return;
+                    // 标记为已读
+                    if (notifId && el.classList.contains('unread')) {
+                        try {
+                            await api('POST', '/notifications/read', { id: parseInt(notifId) });
+                            // 本地减少未读计数
+                            const current = parseInt(dom.notifBadge.textContent) || 1;
+                            const next = current - 1;
+                            if (next <= 0) {
+                                dom.notifBadge.style.display = 'none';
+                            } else {
+                                dom.notifBadge.textContent = next;
+                            }
+                        } catch (_) { /* 静默失败，不影响跳转 */ }
+                    }
                     dialogClose(dom.notifOverlay);
                     await navigateTo('home');
                     await scrollToPost(postId);
@@ -1500,6 +1515,14 @@ async function renderProfile() {
         };
         nickDiv.addEventListener('blur', saveNickname);
         nickDiv.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); nickDiv.blur(); } });
+    }
+
+    // 点击 @username 复制用户主页链接
+    const usernameEl = dom.main.querySelector('.profile-username');
+    if (usernameEl) {
+        usernameEl.addEventListener('click', () => {
+            copyToClipboard(`${window.location.origin}/web#page:user:${state.user.id}`);
+        });
     }
 
     try {
@@ -1618,6 +1641,14 @@ async function renderUserProfile(userId) {
                 navigateTo('chat');
             } catch (e) { showToast(e.message); }
         });
+
+        // 点击 @username 复制用户主页链接
+        const profileUsername = dom.main.querySelector('.profile-username');
+        if (profileUsername) {
+            profileUsername.addEventListener('click', () => {
+                copyToClipboard(`${window.location.origin}/web#page:user:${userId}`);
+            });
+        }
 
         const userPosts = postsData.list;
         const container = $('#user-posts');
