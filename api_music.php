@@ -100,17 +100,6 @@ function handleMusicCreate(): void {
         error('歌词文件链接不能为空');
     }
 
-    // 简单验证 URL 格式（仅对非空值验证）
-    if (!filter_var($musicUrl, FILTER_VALIDATE_URL)) {
-        error('音频链接格式不正确');
-    }
-    if (!filter_var($lrcUrl, FILTER_VALIDATE_URL)) {
-        error('歌词文件链接格式不正确');
-    }
-    if ($bgUrl !== '' && !filter_var($bgUrl, FILTER_VALIDATE_URL)) {
-        error('背景图片链接格式不正确');
-    }
-
     $pdo = getDB();
     $stmt = $pdo->prepare(
         'INSERT INTO music (user_id, title, music_url, lrc_url, bg_url, video_url, lrc_pos, lrc_color, plays_count, created_at)
@@ -171,16 +160,6 @@ function handleMusicUpdate(int $id): void {
     }
     if ($lrcUrl === '') {
         error('歌词文件链接不能为空');
-    }
-
-    if (!filter_var($musicUrl, FILTER_VALIDATE_URL)) {
-        error('音频链接格式不正确');
-    }
-    if (!filter_var($lrcUrl, FILTER_VALIDATE_URL)) {
-        error('歌词文件链接格式不正确');
-    }
-    if ($bgUrl !== '' && !filter_var($bgUrl, FILTER_VALIDATE_URL)) {
-        error('背景图片链接格式不正确');
     }
 
     $pdo = getDB();

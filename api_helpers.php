@@ -169,6 +169,43 @@ function getParam(string $key, $default = null) {
 }
 
 /**
+ * 验证 Cloudflare Turnstile 令牌（服务端验证）
+ * 参考：https://developers.cloudflare.com/turnstile/get-started/server-side-validation/
+ *
+ * @param string $token 前端小部件提交的令牌（通常来自 cf-turnstile-response）
+ * @return bool 验证是否通过
+ */
+function verifyTurnstile(string $token): bool {
+    if ($token === '') {
+        return false;
+    }
+    $url  = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+    $data = [
+        'secret'   => TURNSTILE_SECRET_KEY,
+        'response' => $token,
+        'remoteip' => $_SERVER['REMOTE_ADDR'] ?? '',
+    ];
+
+    $options = [
+        'http' => [
+            'header'  => "Content-type: application/x-www-form-urlencoded\r\n",
+            'method'  => 'POST',
+            'content' => http_build_query($data),
+            'timeout' => 10,
+        ],
+    ];
+
+    $context  = stream_context_create($options);
+    $response = @file_get_contents($url, false, $context);
+    if ($response === false) {
+        return false;
+    }
+
+    $result = json_decode($response, true);
+    return isset($result['success']) && $result['success'] === true;
+}
+
+/**
  * 生成随机文件名
  */
 function randomFileName(string $ext): string {

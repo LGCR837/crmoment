@@ -45,6 +45,7 @@ const dom = {
     authTabLogin: $('#auth-tab-login'),
     authTabRegister: $('#auth-tab-register'),
     btnLogin: $('#btn-login'),
+    btnRagemiLogin: $('#btn-ragemi-login'),
     navAuth: $('#nav-auth'),
     navUser: $('#nav-user'),
     navProfile: $('#nav-profile'),
@@ -231,8 +232,36 @@ function fadeInContainer(container) {
 // ===== Auth =====
 let authMode = 'login';
 
+// ===== Cloudflare Turnstile =====
+const TURNSTILE_SITE_KEY = '0x4AAAAAAEDxohcLN9pa33HD';
+let turnstileWidgetId = null;
+let turnstileToken = '';
+
+function renderTurnstile() {
+    const container = document.getElementById('turnstile-widget');
+    if (!container || typeof turnstile === 'undefined') return;
+    if (turnstileWidgetId !== null) {
+        turnstile.reset(turnstileWidgetId);
+        return;
+    }
+    turnstileWidgetId = turnstile.render(container, {
+        sitekey: TURNSTILE_SITE_KEY,
+        callback: (token) => { turnstileToken = token; },
+        'expired-callback': () => { turnstileToken = ''; },
+        'error-callback': () => { turnstileToken = ''; },
+    });
+}
+
+function resetTurnstile() {
+    turnstileToken = '';
+    if (turnstileWidgetId !== null && typeof turnstile !== 'undefined') {
+        turnstile.reset(turnstileWidgetId);
+    }
+}
+
 function switchAuthMode(mode) {
     authMode = mode;
+    resetTurnstile();
     dom.authTitle.textContent = mode === 'login' ? '登录' : '注册';
     dom.authSubmit.textContent = mode === 'login' ? '登录' : '注册';
     dom.authTabLogin.classList.toggle('active', mode === 'login');
@@ -244,6 +273,9 @@ function switchAuthMode(mode) {
     dom.authNickname.required = mode === 'register';
     dom.authPasswordConfirmGroup.style.display = mode === 'register' ? '' : 'none';
     dom.authPasswordConfirm.required = mode === 'register';
+    // Ragemi 登录按钮仅登录模式显示
+    const ragemiGroup = document.getElementById('ragemi-oauth-group');
+    if (ragemiGroup) ragemiGroup.style.display = mode === 'login' ? '' : 'none';
 }
 
 dom.authTabLogin.addEventListener('click', () => switchAuthMode('login'));
@@ -255,6 +287,11 @@ dom.authSubmit.addEventListener('click', async () => {
     const confirmPassword = dom.authPasswordConfirm.value;
     const nickname = dom.authNickname.value.trim();
 
+    if (!turnstileToken) {
+        dom.authError.textContent = '请完成人机验证';
+        dom.authError.style.display = 'block';
+        return;
+    }
     if (!username || !password) {
         dom.authError.textContent = '请填写用户名和密码';
         dom.authError.style.display = 'block';
@@ -275,8 +312,11 @@ dom.authSubmit.addEventListener('click', async () => {
 
     try {
         const endpoint = authMode === 'login' ? '/auth/login' : '/auth/register';
-        const body = authMode === 'login' ? { username, password } : { username, nickname, password };
+        const body = authMode === 'login'
+            ? { username, password, cf_turnstile_response: turnstileToken }
+            : { username, nickname, password, cf_turnstile_response: turnstileToken };
         const result = await api('POST', endpoint, body);
+        resetTurnstile();
         if (result.token) localStorage.setItem('crmoment-token', result.token);
         state.user = result;
         updateAuthUI();
@@ -290,10 +330,23 @@ dom.authSubmit.addEventListener('click', async () => {
     } catch (e) {
         dom.authError.textContent = e.message;
         dom.authError.style.display = 'block';
+        // token 已被服务端验证消费（单次有效），失败后需重置小部件以便重新验证
+        resetTurnstile();
     }
 });
 
 dom.authCancel.addEventListener('click', () => dialogClose(dom.authOverlay));
+
+// ===== Ragemi OAuth =====
+dom.btnRagemiLogin?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    try {
+        const result = await api('GET', '/auth/ragemi/url?action=login');
+        if (result.url) window.location.href = result.url;
+    } catch (e) {
+        showToast(e.message || '获取 Ragemi 登录地址失败');
+    }
+});
 
 function updateAuthUI() {
     if (state.user) {
@@ -357,6 +410,7 @@ document.addEventListener('DOMContentLoaded', () => {
 dom.btnLogin.addEventListener('click', () => {
     switchAuthMode('login');
     dialogOpen(dom.authOverlay);
+    renderTurnstile();
 });
 
 async function handleLogout() {
@@ -395,6 +449,44 @@ async function navigateTo(page) {
         case 'chat':
             if (state.currentConvId) renderConversationDetail(state.currentConvId);
             break;
+    }
+}
+
+// ===== Email Bind Dialog Functions =====
+
+function openEmailBindDialog() {
+    const overlay = $('#email-bind-overlay');
+    const input = $('#email-input');
+    input.value = '';
+    $('#email-bind-error').style.display = 'none';
+    dialogOpen(overlay);
+    setTimeout(() => input.focus(), 100);
+}
+
+async function handleEmailBindSubmit() {
+    const email = $('#email-input').value.trim();
+    const errorEl = $('#email-bind-error');
+    if (!email) {
+        errorEl.textContent = '请输入邮箱地址';
+        errorEl.style.display = '';
+        return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errorEl.textContent = '邮箱格式不正确';
+        errorEl.style.display = '';
+        return;
+    }
+    try {
+        await api('POST', '/auth/email/send-code', { email });
+        dialogClose($('#email-bind-overlay'));
+        showToast('验证邮件已发送，请检查您的邮箱（包括垃圾邮件）');
+        // 重新加载邮箱状态
+        if (typeof loadEmailBindStatus === 'function') {
+            // The loadEmailBindStatus is an IIFE inside renderProfile, but we can just re-render profile
+        }
+    } catch (e) {
+        errorEl.textContent = e.message;
+        errorEl.style.display = '';
     }
 }
 
@@ -1447,7 +1539,7 @@ async function renderProfile() {
                 <p style="color:var(--ba-text-muted);margin-bottom:16px">请先登录以查看个人主页</p>
                 <button class="btn-primary" id="profile-login-btn">${icon('login')} 登录 / 注册</button>
             </div>`;
-        $('#profile-login-btn')?.addEventListener('click', () => { switchAuthMode('login'); dialogOpen(dom.authOverlay); });
+        $('#profile-login-btn')?.addEventListener('click', () => { switchAuthMode('login'); dialogOpen(dom.authOverlay); renderTurnstile(); });
         return;
     }
     dom.main.innerHTML = `
@@ -1465,6 +1557,13 @@ async function renderProfile() {
                 <button class="btn-text" id="btn-logout" style="color:#d4a0a0">退出登录</button>
             </div>
             <input type="file" id="avatar-input" accept="image/*" style="display:none">
+        </div>
+        <div class="section-title">账号绑定</div>
+        <div class="ragemi-bind-card" id="ragemi-bind-card">
+            <div class="ragemi-bind-status">检测中...</div>
+        </div>
+        <div class="ragemi-bind-card" id="email-bind-card">
+            <div class="ragemi-bind-status">检测中...</div>
         </div>
         <div class="section-title">我的动态</div>
         <div id="my-posts"></div>`;
@@ -1524,6 +1623,110 @@ async function renderProfile() {
             copyToClipboard(`${window.location.origin}/web#page:user:${state.user.id}`);
         });
     }
+
+    // ===== Ragemi 账号绑定状态 =====
+    (async function loadRagemiBindStatus() {
+        const card = $('#ragemi-bind-card');
+        if (!card) return;
+        try {
+            const result = await api('GET', '/auth/ragemi/status');
+            if (result.bound) {
+                card.innerHTML = `
+                    <div class="ragemi-bind-row">
+                        <div class="ragemi-bind-info">
+                            <span class="ragemi-bind-icon">R</span>
+                            <span><strong>Ragemi</strong><br><span class="ragemi-bind-hint">已绑定</span></span>
+                        </div>
+                        <button class="btn-text" id="btn-ragemi-unbind" style="color:#d4a0a0">解绑</button>
+                    </div>`;
+                $('#btn-ragemi-unbind')?.addEventListener('click', async () => {
+                    if (!confirm('确定要解绑 Ragemi 账号吗？解绑后将无法通过 Ragemi 登录。')) return;
+                    try {
+                        await api('POST', '/auth/ragemi/unbind');
+                        showToast('Ragemi 账号已解绑');
+                        loadRagemiBindStatus();
+                    } catch (e) { showToast(e.message); }
+                });
+            } else {
+                card.innerHTML = `
+                    <div class="ragemi-bind-row">
+                        <div class="ragemi-bind-info">
+                            <span class="ragemi-bind-icon">R</span>
+                            <span><strong>Ragemi</strong><br><span class="ragemi-bind-hint">未绑定</span></span>
+                        </div>
+                        <a href="#" class="btn-primary ragemi-bind-btn" id="btn-ragemi-bind">绑定账号</a>
+                    </div>`;
+                $('#btn-ragemi-bind')?.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    try {
+                        const result = await api('GET', '/auth/ragemi/url?action=bind');
+                        if (result.url) window.location.href = result.url;
+                    } catch (e) {
+                        showToast(e.message || '获取绑定地址失败');
+                    }
+                });
+            }
+        } catch (e) {
+            card.innerHTML = `<div class="ragemi-bind-status" style="color:var(--ba-text-muted)">绑定状态加载失败</div>`;
+        }
+    })();
+
+    // ===== 邮箱绑定状态 =====
+    (async function loadEmailBindStatus() {
+        const card = $('#email-bind-card');
+        if (!card) return;
+        try {
+            const result = await api('GET', '/auth/email/status');
+            if (result.bound && result.verified) {
+                card.innerHTML = `
+                    <div class="ragemi-bind-row">
+                        <div class="ragemi-bind-info">
+                            <span class="email-bind-icon">@</span>
+                            <span><strong>邮箱</strong><br><span class="ragemi-bind-hint">${escapeHtml(result.email)}</span></span>
+                        </div>
+                        <div style="display:flex;gap:8px;align-items:center">
+                            <span style="font-size:12px;color:var(--ba-accent)">已绑定</span>
+                            <button class="btn-text" id="btn-email-change" style="font-size:12px">换绑</button>
+                            <button class="btn-text" id="btn-email-unbind" style="color:#d4a0a0;font-size:12px">解绑</button>
+                        </div>
+                    </div>`;
+                $('#btn-email-unbind')?.addEventListener('click', async () => {
+                    if (!confirm('确定要解绑邮箱吗？')) return;
+                    try {
+                        await api('POST', '/auth/email/unbind');
+                        showToast('邮箱已解绑');
+                        loadEmailBindStatus();
+                    } catch (e) { showToast(e.message); }
+                });
+                $('#btn-email-change')?.addEventListener('click', () => {
+                    openEmailBindDialog();
+                });
+            } else if (result.bound && !result.verified) {
+                card.innerHTML = `
+                    <div class="ragemi-bind-row">
+                        <div class="ragemi-bind-info">
+                            <span class="email-bind-icon">@</span>
+                            <span><strong>邮箱</strong><br><span class="ragemi-bind-hint">${escapeHtml(result.email)}</span></span>
+                        </div>
+                        <span style="font-size:12px;color:var(--ba-text-muted)">待验证</span>
+                    </div>`;
+            } else {
+                card.innerHTML = `
+                    <div class="ragemi-bind-row">
+                        <div class="ragemi-bind-info">
+                            <span class="email-bind-icon">@</span>
+                            <span><strong>邮箱</strong><br><span class="ragemi-bind-hint">未绑定</span></span>
+                        </div>
+                        <button class="btn-primary ragemi-bind-btn" id="btn-email-bind">绑定邮箱</button>
+                    </div>`;
+                $('#btn-email-bind')?.addEventListener('click', () => {
+                    openEmailBindDialog();
+                });
+            }
+        } catch (e) {
+            card.innerHTML = `<div class="ragemi-bind-status" style="color:var(--ba-text-muted)">绑定状态加载失败</div>`;
+        }
+    })();
 
     try {
         const data = await api('GET', `/posts?page=1&size=10&user_id=${state.user.id}`);
@@ -1725,7 +1928,7 @@ async function renderExplore() {
         <div id="music-loading" class="loading-indicator"><div class="spinner"></div></div>`;
 
     $('#explore-home-btn')?.addEventListener('click', () => navigateTo('home'));
-    $('#explore-login-btn')?.addEventListener('click', () => { switchAuthMode('login'); dialogOpen(dom.authOverlay); });
+    $('#explore-login-btn')?.addEventListener('click', () => { switchAuthMode('login'); dialogOpen(dom.authOverlay); renderTurnstile(); });
     $('#btn-add-music')?.addEventListener('click', openAddMusicDialog);
     $('#btn-search-music')?.addEventListener('click', openSearchDialog);
     await loadMusic();
@@ -2321,17 +2524,10 @@ function escapeHtml(str) {
 
 function renderTextWithLinks(text) {
     if (!text) return '';
-    const htmlBlocks = [];
-    const placeholderPrefix = '%%HTMLBLOCK_';
-    const textWithPlaceholders = text.replace(/\[htmltext\]([\s\S]*?)\[\/htmltext\]/g, (match, content) => {
-        const idx = htmlBlocks.length;
-        htmlBlocks.push(content);
-        return placeholderPrefix + idx + '%%';
-    });
-    const escaped = escapeHtml(textWithPlaceholders);
+    const escaped = escapeHtml(text);
     return escaped.replace(/\[link\]([^\[]+)\[text\]([^\[]+?)\[\/link\]/g, (match, url, buttonText) => {
         return `<a href="${url.trim()}" target="_blank" rel="noopener noreferrer" class="inline-link-btn">${buttonText.trim()}</a>`;
-    }).replace(/%%HTMLBLOCK_(\d+)%%/g, (match, idx) => htmlBlocks[parseInt(idx)] || '');
+    });
 }
 
 // ===== Scroll Reveal =====
@@ -2385,8 +2581,63 @@ async function init() {
     $('#search-music-cancel')?.addEventListener('click', () => dialogClose($('#search-music-overlay')));
     $('#search-music-clear')?.addEventListener('click', handleSearchClear);
     $('#music-search')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSearchSubmit(); });
+
+    // ===== Email Bind Dialog =====
+    $('#email-bind-cancel')?.addEventListener('click', () => {
+        dialogClose($('#email-bind-overlay'));
+        $('#email-bind-error').style.display = 'none';
+    });
+    $('#email-bind-submit')?.addEventListener('click', handleEmailBindSubmit);
+    $('#email-input')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); handleEmailBindSubmit(); }
+    });
+    $('#email-bind-overlay')?.addEventListener('close', () => {
+        $('#email-bind-error').style.display = 'none';
+    });
+
     console.log('CRMoment Web App (BA Theme) 已启动');
-}
+
+    // 检测 Ragemi OAuth 回调参数
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const ragemiBound = params.get('ragemi_bound');
+    const ragemiError = params.get('ragemi_error');
+
+    if (token) {
+        localStorage.setItem('crmoment-token', token);
+        window.history.replaceState({}, '', '/web/');
+        // 重新加载用户信息
+        try {
+            const user = await api('GET', '/user/me');
+            state.user = user;
+            updateAuthUI();
+            showToast('Ragemi 登录成功');
+            renderHome();
+        } catch (_) { showToast('登录状态加载失败'); }
+    }
+    if (ragemiBound) {
+        window.history.replaceState({}, '', '/web/');
+        showToast('Ragemi 账号绑定成功');
+    }
+    if (ragemiError) {
+            window.history.replaceState({}, '', '/web/');
+            showToast('Ragemi: ' + ragemiError);
+        }
+
+        // 检测邮箱验证回调参数
+        const emailBound = params.get('email_bound');
+        const emailError = params.get('email_error');
+
+        if (emailBound) {
+            window.history.replaceState({}, '', '/web/');
+            showToast('邮箱绑定成功');
+            if (state.user) renderProfile();
+        }
+        if (emailError) {
+            window.history.replaceState({}, '', '/web/');
+            showToast('邮箱验证失败: ' + emailError);
+        }
+    }
 
 document.addEventListener('DOMContentLoaded', init);
 

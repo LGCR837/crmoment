@@ -12,9 +12,14 @@ CREATE TABLE IF NOT EXISTS `users` (
     `password_hash` VARCHAR(255) NOT NULL,
     `avatar` VARCHAR(255) DEFAULT NULL COMMENT '头像路径',
     `bio` VARCHAR(200) DEFAULT NULL COMMENT '个人简介',
+    `ragemi_id` VARCHAR(50) DEFAULT NULL UNIQUE COMMENT 'Ragemi 用户 ID',
+    `email` VARCHAR(255) DEFAULT NULL UNIQUE COMMENT '邮箱地址',
+    `email_verified` TINYINT(1) DEFAULT 0 COMMENT '邮箱是否已验证',
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     INDEX `idx_username` (`username`),
-    INDEX `idx_nickname` (`nickname`)
+    INDEX `idx_nickname` (`nickname`),
+    INDEX `idx_ragemi_id` (`ragemi_id`),
+    INDEX `idx_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 迁移说明：已有用户的 nickname 需手动设置为与 username 相同
@@ -181,3 +186,21 @@ CREATE TABLE IF NOT EXISTS `playlist_tracks` (
     INDEX `idx_playlist_id` (`playlist_id`),
     FOREIGN KEY (`playlist_id`) REFERENCES `user_playlists`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 邮箱验证记录表
+CREATE TABLE IF NOT EXISTS `email_verifications` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `user_id` INT UNSIGNED NOT NULL COMMENT '用户 ID',
+    `email` VARCHAR(255) NOT NULL COMMENT '目标邮箱',
+    `token` VARCHAR(64) NOT NULL UNIQUE COMMENT '验证 token',
+    `expires_at` DATETIME NOT NULL COMMENT '过期时间',
+    `used` TINYINT(1) DEFAULT 0 COMMENT '是否已使用',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_token` (`token`),
+    INDEX `idx_user_id` (`user_id`),
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 迁移说明：邮箱绑定功能
+-- ALTER TABLE users ADD COLUMN email VARCHAR(255) DEFAULT NULL UNIQUE, ADD COLUMN email_verified TINYINT(1) DEFAULT 0;
+-- 参见 migrations/003_add_email_verification.sql

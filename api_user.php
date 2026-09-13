@@ -68,7 +68,8 @@ function handleUserAvatar(): void {
         error('头像保存失败', 500);
     }
 
-    $url = getUploadUrl('avatar', $filename);
+    // 追加版本参数（时间戳），URL 变化后浏览器会绕过本地缓存重新加载新头像
+    $url = getUploadUrl('avatar', $filename) . '?v=' . time();
 
     // 更新数据库
     $pdo = getDB();

@@ -16,6 +16,8 @@ require_once __DIR__ . '/api_notifications.php';
 require_once __DIR__ . '/api_upload.php';
 require_once __DIR__ . '/api_conversations.php';
 require_once __DIR__ . '/api_music.php';
+require_once __DIR__ . '/api_ragemi.php';
+require_once __DIR__ . '/api_email.php';
 
 // 解析请求路径
 $method = $_SERVER['REQUEST_METHOD'];
@@ -54,6 +56,24 @@ try {
         handleAuthLogin();
     } elseif ($path === '/auth/logout' && $method === 'POST') {
         handleAuthLogout();
+
+    // ---- Ragemi OAuth ----
+    } elseif ($path === '/auth/ragemi/url' && $method === 'GET') {
+        handleRagemiAuthUrl();
+    } elseif ($path === '/auth/ragemi/status' && $method === 'GET') {
+        handleRagemiStatus();
+    } elseif ($path === '/auth/ragemi/bind' && $method === 'POST') {
+        handleRagemiBind();
+    } elseif ($path === '/auth/ragemi/unbind' && $method === 'POST') {
+        handleRagemiUnbind();
+
+    // ---- Email Binding ----
+    } elseif ($path === '/auth/email/send-code' && $method === 'POST') {
+        handleEmailSendCode();
+    } elseif ($path === '/auth/email/status' && $method === 'GET') {
+        handleEmailStatus();
+    } elseif ($path === '/auth/email/unbind' && $method === 'POST') {
+        handleEmailUnbind();
 
     // ---- User ----
     } elseif ($path === '/user/me' && $method === 'GET') {

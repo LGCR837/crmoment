@@ -14,6 +14,11 @@ function handleAuthRegister(): void {
     $nickname = trim($data['nickname'] ?? '');
     $password = $data['password'] ?? '';
 
+    // Turnstile 人机验证
+    if (!verifyTurnstile($data['cf_turnstile_response'] ?? '')) {
+        error('人机验证失败，请重试');
+    }
+
     if (strlen($username) < 2 || strlen($username) > 50) {
         error('用户名长度需在 2-50 个字符之间');
     }
@@ -74,6 +79,11 @@ function handleAuthLogin(): void {
     $data     = getJsonBody();
     $account  = trim($data['username'] ?? '');
     $password = $data['password'] ?? '';
+
+    // Turnstile 人机验证
+    if (!verifyTurnstile($data['cf_turnstile_response'] ?? '')) {
+        error('人机验证失败，请重试');
+    }
 
     if ($account === '' || $password === '') {
         error('用户名和密码不能为空');

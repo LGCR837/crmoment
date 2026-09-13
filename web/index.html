@@ -97,6 +97,12 @@
                     <input type="password" id="auth-password-confirm" class="field-input" placeholder="确认密码" required minlength="6" autocomplete="new-password">
                 </div>
                 <div id="auth-error" class="error-message" style="display:none"></div>
+                <!-- Cloudflare Turnstile 人机验证小部件 -->
+                <div id="turnstile-widget" style="margin-top:12px"></div>
+                <div id="ragemi-oauth-group">
+                    <div class="oauth-divider"><span>或</span></div>
+                    <a href="#" id="btn-ragemi-login" class="btn-oauth">使用 Ragemi 登录</a>
+                </div>
             </div>
             <div class="modal-actions">
                 <button class="btn-text" id="auth-cancel">取消</button>
@@ -246,6 +252,28 @@
         </div>
     </div>
 
+    <!-- Email Bind Dialog -->
+    <div class="modal-overlay" id="email-bind-overlay">
+        <div class="modal">
+            <div class="modal-headline">绑定邮箱</div>
+            <div class="modal-content">
+                <div class="field-group">
+                    <input type="email" id="email-input" class="field-input" placeholder="请输入邮箱地址" required autocomplete="email">
+                </div>
+                <div id="email-bind-error" class="error-message" style="display:none"></div>
+                <div style="font-size:13px;color:var(--ba-text-muted);margin-top:4px">
+                    验证邮件将发送到该邮箱，点击邮件中的链接完成绑定。
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-text" id="email-bind-cancel">取消</button>
+                <button class="btn-primary" id="email-bind-submit">发送验证邮件</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cloudflare Turnstile 人机验证脚本（显式渲染，由 app.js 控制） -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
     <script type="module" src="app.js"></script>
 </body>
 </html>
